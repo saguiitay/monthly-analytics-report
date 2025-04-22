@@ -18,7 +18,8 @@ export class ReportFormatter {
 | User Engagement Events | ${metrics.engagementEvents.current.toLocaleString()} | ${metrics.engagementEvents.previous.toLocaleString()} | ${this.formatChange(metrics.engagementEvents.percentageChange)} |
 | Google Indexed Pages | ${metrics.indexedPages.toLocaleString()} | - | - |
 | Total Impressions | ${metrics.totalImpressions.current.toLocaleString()} | ${metrics.totalImpressions.previous.toLocaleString()} | ${this.formatChange(metrics.totalImpressions.percentageChange)} |
-| Ahrefs Domain Rating (DR) | ${metrics.domainRating} | - | - |`;
+| Ahrefs Domain Rating (DR) | - | - | - |
+`;
   }
 
   /**
@@ -27,9 +28,11 @@ export class ReportFormatter {
   private static formatProjectReport(report: ProjectReport): string {
     const { project, period } = report;
     
-    return `## ${project.name} – [Visit website](${project.url})
+    return `## ${project.name}
 
-Period: ${period.startDate} to ${period.endDate}
+Visit website: [${project.name}](${project.url})
+
+<changes here>
 
 ### Statistics
 
@@ -43,7 +46,8 @@ ${ReportFormatter.formatProjectTable(report)}
   static formatReport(reports: ProjectReport[], title?: string): string {
     const reportTitle = title || `Analytics Report - ${reports[0].period.startDate} to ${reports[0].period.endDate}`;
     
-    const markdownReport = `# ${reportTitle}
+    const markdownReport = `
+Period: ${reports[0].period.startDate} to ${reports[0].period.endDate}
 
 ${reports.map(report => ReportFormatter.formatProjectReport(report)).join('\n\n')}
 `;

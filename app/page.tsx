@@ -18,19 +18,47 @@ export default function Home() {
     // Example project config
     const projects: ProjectConfig[] = [
       {
-        name: 'ascii-images.com',
+        name: 'Calculation Hub',
+        url: 'https://calculation-hub.com/',
+        gaPropertyId: '479179989',
+        gscSiteUrl: 'sc-domain:calculation-hub.com',
+        domain: 'calculation-hub.com'
+      },
+      {
+        name: 'Rangom Generatr',
+        url: 'https://randomgeneratr.com/',
+        gaPropertyId: '405238687',
+        gscSiteUrl: 'sc-domain:randomgeneratr.com',
+        domain: 'randomgeneratr.com'
+      },
+      {
+        name: 'Shibutz',
+        url: 'https://shibutz.com/',
+        gaPropertyId: '446114465',
+        gscSiteUrl: 'sc-domain:shibutz.com',
+        domain: 'shibutz.com'
+      },
+      {
+        name: 'ASCII Art Generator',
         url: 'https://ascii-images.com',
         gaPropertyId: '481852240',
         gscSiteUrl: 'sc-domain:ascii-images.com',
         domain: 'ascii-images.com'
       },
-      //  {
-      //   name: 'binge-waste.com',
-      //   url: 'https://binge-waste.com',
-      //   gaPropertyId: '440738598',
-      //   gscSiteUrl: 'sc-domain:binge-waste.com',
-      //   domain: 'binge-waste.com'
-      // }
+      {
+        name: 'Peronality Tests',
+        url: 'https://personal-tests.com/',
+        gaPropertyId: '481852240',
+        gscSiteUrl: 'sc-domain:personal-tests.com',
+        domain: 'personal-tests.com'
+      },
+      {
+        name: 'Binge Waste',
+        url: 'https://binge-waste.com',
+        gaPropertyId: '440738598',
+        gscSiteUrl: 'sc-domain:binge-waste.com',
+        domain: 'binge-waste.com'
+      },
     ];
 
     try {
