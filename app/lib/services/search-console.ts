@@ -1,4 +1,4 @@
-import { google, searchconsole_v1 } from 'googleapis';
+import { google, searchconsole_v1, Auth } from 'googleapis';
 import { GoogleAuth } from 'google-auth-library';
 import { ServiceAccountConfig } from '../types';
 import { format } from 'date-fns';
@@ -25,7 +25,7 @@ export class SearchConsoleService {
       const authClient = await auth.getClient();
       const client = google.searchconsole({
         version: 'v1',
-        auth: authClient as any // TODO: Improve typing when googleapis fixes type definitions
+        auth: (authClient as unknown) as Auth.OAuth2Client
       });
 
       // const res = await client.sites.list();

@@ -26,7 +26,7 @@ export class ReportFormatter {
    * Generate a complete Markdown report for a project
    */
   private static formatProjectReport(report: ProjectReport): string {
-    const { project, period } = report;
+    const { project } = report;
     
     return `## ${project.name}
 
@@ -43,9 +43,7 @@ ${ReportFormatter.formatProjectTable(report)}
   /**
    * Generate a complete Markdown report for multiple projects
    */
-  static formatReport(reports: ProjectReport[], title?: string): string {
-    const reportTitle = title || `Analytics Report - ${reports[0].period.startDate} to ${reports[0].period.endDate}`;
-    
+  static formatReport(reports: ProjectReport[]): string {    
     const markdownReport = `
 Period: ${reports[0].period.startDate} to ${reports[0].period.endDate}
 

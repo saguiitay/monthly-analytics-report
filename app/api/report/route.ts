@@ -5,7 +5,7 @@ import { ProjectConfig } from '../../lib/types';
 
 export async function POST(request: NextRequest) {
   try {
-    const { projects, title } = await request.json();
+    const { projects } = await request.json();
 
     if (!Array.isArray(projects)) {
       return NextResponse.json(
@@ -42,9 +42,6 @@ export async function POST(request: NextRequest) {
         clientEmail: process.env.GOOGLE_CLIENT_EMAIL!,
         privateKey: process.env.GOOGLE_PRIVATE_KEY!,
         propertyId: projects[0].gaPropertyId // We'll use the first project's property ID
-      },
-      {
-        apiToken: process.env.AHREFS_API_TOKEN!
       }
     );
 
@@ -52,7 +49,7 @@ export async function POST(request: NextRequest) {
     const reports = await generator.generateReports(projects as ProjectConfig[]);
 
     // Format the reports
-    const markdown = ReportFormatter.formatReport(reports, title);
+    const markdown = ReportFormatter.formatReport(reports);
     //const html = ReportFormatter.markdownToHtml(markdown);
     //const rawHtml = ReportFormatter.markdownToRawHtml(markdown);
 

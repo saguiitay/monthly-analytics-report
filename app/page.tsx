@@ -48,7 +48,7 @@ export default function Home() {
       {
         name: 'Peronality Tests',
         url: 'https://personal-tests.com/',
-        gaPropertyId: '481852240',
+        gaPropertyId: '486670475',
         gscSiteUrl: 'sc-domain:personal-tests.com',
         domain: 'personal-tests.com'
       },

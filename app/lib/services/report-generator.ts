@@ -1,7 +1,7 @@
 import { AnalyticsService } from './analytics';
 import { SearchConsoleService } from './search-console';
 //import { AhrefsService } from './ahrefs';
-import { ProjectConfig, ProjectReport, ServiceAccountConfig, AhrefsConfig } from '../types';
+import { ProjectConfig, ProjectReport, ServiceAccountConfig } from '../types';
 import { format } from 'date-fns';
 
 export class ReportGenerator {
@@ -9,10 +9,8 @@ export class ReportGenerator {
   private googleConfig: ServiceAccountConfig;
 
   constructor(
-    googleConfig: ServiceAccountConfig,
-    ahrefsConfig: AhrefsConfig
+    googleConfig: ServiceAccountConfig
   ) {
-    //this.ahrefs = new AhrefsService(ahrefsConfig);
     this.googleConfig = googleConfig;
   }
 
@@ -31,7 +29,8 @@ export class ReportGenerator {
     let currentPageViews = 0, previousPageViews = 0,
         currentEngagementEvents = 0, previousEngagementEvents = 0,
         currentImpressions = 0, previousImpressions = 0,
-        indexedPages = 0, domainRating = -1;
+        indexedPages = 0;
+    const domainRating = -1;
 
     try {
       // Create a new Analytics instance for this project
