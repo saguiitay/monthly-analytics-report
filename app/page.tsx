@@ -1,103 +1,118 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+import { ProjectConfig } from './lib/types';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ markdown: string; html: string } | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    // Example project config
+    const projects: ProjectConfig[] = [
+      {
+        name: 'ascii-images.com',
+        url: 'https://ascii-images.com',
+        gaPropertyId: '481852240',
+        gscSiteUrl: 'sc-domain:ascii-images.com',
+        domain: 'ascii-images.com'
+      },
+      //  {
+      //   name: 'binge-waste.com',
+      //   url: 'https://binge-waste.com',
+      //   gaPropertyId: '440738598',
+      //   gscSiteUrl: 'sc-domain:binge-waste.com',
+      //   domain: 'binge-waste.com'
+      // }
+    ];
+
+    try {
+      const response = await fetch('/api/report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          projects,
+          title: 'Monthly Analytics Report'
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to generate report');
+      }
+
+      const data = await response.json();
+      setResult(data);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="min-h-screen p-8">
+      <h1 className="text-3xl font-bold mb-8">
+        Monthly Analytics Report Generator
+      </h1>
+
+      <form onSubmit={handleSubmit} className="mb-8">
+        <button
+          type="submit"
+          disabled={loading}
+          className={`px-4 py-2 bg-blue-500 text-white rounded ${
+            loading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
+          }`}
+        >
+          {loading ? 'Generating...' : 'Generate Report'}
+        </button>
+      </form>
+
+      {error && (
+        <div className="p-4 mb-8 bg-red-100 text-red-700 rounded">
+          <h3 className="font-bold mb-2">Error Generating Report</h3>
+          <p className="mb-4">{error}</p>
+          <div className="text-sm">
+            <p className="mb-2">Please verify:</p>
+            <ul className="list-disc list-inside">
+              <li>Google Analytics Data API is enabled in your Google Cloud Console</li>
+              <li>Search Console API is enabled and the service account has access</li>
+              <li>Service account credentials are correctly formatted in .env.local</li>
+              <li>Ahrefs API token is valid</li>
+              <li>Project configuration (propertyId, siteUrl, domain) is correct</li>
+            </ul>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      )}
+
+      {result && (
+        <div>
+          <h2 className="text-2xl font-bold mb-4">Report Generated</h2>
+          
+          <div className="mb-8">
+            <h3 className="text-xl font-semibold mb-2">Markdown</h3>
+            <pre className="p-4 bg-gray-100 rounded overflow-x-auto">
+              {result.markdown}
+            </pre>
+          </div>
+
+          <div>
+            <h3 className="text-xl font-semibold mb-2">HTML Preview</h3>
+            <div
+              className="p-4 bg-white border rounded"
+              dangerouslySetInnerHTML={{ __html: result.html }}
+            />
+          </div>
+        </div>
+      )}
+    </main>
   );
 }
