@@ -53,11 +53,13 @@ export async function POST(request: NextRequest) {
 
     // Format the reports
     const markdown = ReportFormatter.formatReport(reports, title);
-    const html = ReportFormatter.markdownToHtml(markdown);
+    //const html = ReportFormatter.markdownToHtml(markdown);
+    //const rawHtml = ReportFormatter.markdownToRawHtml(markdown);
 
     return NextResponse.json({
       markdown,
-      html
+      //rawHtml,
+      //html,
     });
   } catch (error) {
     console.error('Error generating report:', error);

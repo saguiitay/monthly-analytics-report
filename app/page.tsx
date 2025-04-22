@@ -6,7 +6,8 @@ import { ProjectConfig } from './lib/types';
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ markdown: string; html: string } | null>(null);
+  const [result, setResult] = useState<{ markdown: string;  } | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -98,18 +99,26 @@ export default function Home() {
           <h2 className="text-2xl font-bold mb-4">Report Generated</h2>
           
           <div className="mb-8">
-            <h3 className="text-xl font-semibold mb-2">Markdown</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xl font-semibold">Markdown</h3>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(result.markdown);
+                  setCopySuccess(true);
+                  setTimeout(() => setCopySuccess(false), 2000);
+                }}
+                className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded flex items-center gap-2 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                {copySuccess ? 'Copied!' : 'Copy Text'}
+              </button>
+            </div>
             <pre className="p-4 bg-gray-100 rounded overflow-x-auto">
               {result.markdown}
             </pre>
-          </div>
-
-          <div>
-            <h3 className="text-xl font-semibold mb-2">HTML Preview</h3>
-            <div
-              className="p-4 bg-white border rounded"
-              dangerouslySetInnerHTML={{ __html: result.html }}
-            />
           </div>
         </div>
       )}

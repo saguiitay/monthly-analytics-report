@@ -13,7 +13,7 @@ export class ReportFormatter {
     const { metrics } = report;
     
     return `| Stat | Current | Previous | Change |
-|------|--------:|---------:|--------:|
+|:------|--------:|---------:|--------:|
 | Page Views | ${metrics.pageViews.current.toLocaleString()} | ${metrics.pageViews.previous.toLocaleString()} | ${this.formatChange(metrics.pageViews.percentageChange)} |
 | User Engagement Events | ${metrics.engagementEvents.current.toLocaleString()} | ${metrics.engagementEvents.previous.toLocaleString()} | ${this.formatChange(metrics.engagementEvents.percentageChange)} |
 | Google Indexed Pages | ${metrics.indexedPages.toLocaleString()} | - | - |
@@ -52,66 +52,52 @@ ${reports.map(report => ReportFormatter.formatProjectReport(report)).join('\n\n'
   }
 
   /**
-   * Convert Markdown to HTML
+   * Format Markdown as clean HTML suitable for WordPress
    */
   static markdownToHtml(markdown: string): string {
-    // Basic conversion of markdown to HTML
-    return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Analytics Report</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 2rem;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 1rem 0;
-    }
-    th, td {
-      padding: 0.5rem;
-      border: 1px solid #ddd;
-      text-align: left;
-    }
-    th {
-      background-color: #f5f5f5;
-    }
-    td:last-child {
-      text-align: right;
-    }
-    h1, h2, h3 {
-      color: #333;
-    }
-    a {
-      color: #0066cc;
-      text-decoration: none;
-    }
-    a:hover {
-      text-decoration: underline;
-    }
-  </style>
-</head>
-<body>
-  ${markdown
-    .replace(/^# (.*$)/gm, '<h1>$1</h1>')
-    .replace(/^## (.*$)/gm, '<h2>$1</h2>')
-    .replace(/^### (.*$)/gm, '<h3>$1</h3>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\|([^|]*)\|/g, '<td>$1</td>')
-    .replace(/^<td>/gm, '<tr>')
-    .replace(/<\/td>$/gm, '</tr>')
-    .replace(/\n\|---([^|]*)\|/g, '')
-    .replace(/<tr>(<td>[^<]*<\/td>)+<\/tr>/,
-      (match) => match.replace(/<td>/g, '<th>').replace(/<\/td>/g, '</th>'))}
-</body>
-</html>`;
+    // Convert markdown to clean HTML without document wrapping
+    return `<div class="analytics-report">` + markdown
+      // Headers
+      .replace(/^# (.*$)/gm, '<h1 class="analytics-report-title">$1</h1>')
+      .replace(/^## (.*$)/gm, '<h2 class="analytics-report-subtitle">$1</h2>')
+      .replace(/^### (.*$)/gm, '<h3 class="analytics-report-section">$1</h3>')
+      // Links
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="analytics-report-link">$1</a>')
+      // Paragraphs - wrap content in paragraphs
+      .replace(/^(?!<h[1-6]|<table|<div)(.+)$/gm, '<p>$1</p>')
+      .replace(/\n\n/g, '\n')
+      // Tables - using WordPress-friendly classes
+      .replace(/\|([^|]*)\|/g, (match, content) => {
+        // Trim content and replace multiple spaces with single space
+        const cleanContent = content.trim().replace(/\s+/g, ' ');
+        return `<td class="analytics-report-cell" style="text-align: ${content.includes(':') ? 'left' : 'right'}">${cleanContent}</td>`;
+      })
+      .replace(/^<td/gm, '<tr><td')
+      .replace(/<\/td>$/gm, '</td></tr>')
+      .replace(/\n\|:[^|]*\|/g, '') // Remove alignment row
+      // Convert header cells and wrap in thead
+      .replace(/<tr>(<td[^>]*>[^<]*<\/td>)+<\/tr>/, (match) => 
+        `<thead>${match
+          .replace(/<td class="analytics-report-cell"/g, '<th class="analytics-report-header"')
+          .replace(/<\/td>/g, '</th>')}</thead>`)
+      // Wrap remaining rows in tbody
+      .replace(/(<tr>(?!<th)[\s\S]*?<\/tr>)/g, '<tbody>$1</tbody>')
+      // Wrap table in container with margins
+      .replace(/(<thead>[\s\S]*<\/tbody>)/, (match) => 
+        `<div class="analytics-report-table-container" style="margin: 2em 0">
+          <table class="analytics-report-table" style="width: 100%; border-collapse: collapse; border: 1px solid #ddd">
+            ${match}
+          </table>
+        </div>`) + 
+      '</div>';
+  }
+
+  static markdownToRawHtml(markdown: string): string {
+    // Convert markdown to clean HTML without document wrapping
+    return markdown
+      // replace spaces with &nbsp;
+      .replace(/ /g, '&nbsp;')
+      // Paragraphs - wrap content in paragraphs
+      .replace(/\n/g, '<br/>')
   }
 }
