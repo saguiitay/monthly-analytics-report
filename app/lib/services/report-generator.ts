@@ -1,18 +1,18 @@
 import { AnalyticsService } from './analytics';
 import { SearchConsoleService } from './search-console';
-import { AhrefsService } from './ahrefs';
+//import { AhrefsService } from './ahrefs';
 import { ProjectConfig, ProjectReport, ServiceAccountConfig, AhrefsConfig } from '../types';
 import { format } from 'date-fns';
 
 export class ReportGenerator {
-  private ahrefs: AhrefsService;
+  //private ahrefs: AhrefsService;
   private googleConfig: ServiceAccountConfig;
 
   constructor(
     googleConfig: ServiceAccountConfig,
     ahrefsConfig: AhrefsConfig
   ) {
-    this.ahrefs = new AhrefsService(ahrefsConfig);
+    //this.ahrefs = new AhrefsService(ahrefsConfig);
     this.googleConfig = googleConfig;
   }
 
