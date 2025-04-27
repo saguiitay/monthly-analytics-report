@@ -14,11 +14,11 @@ export class ReportFormatter {
     
     return `| Stat | Current | Previous | Change |
 |:------|--------:|---------:|--------:|
-| Page Views | ${metrics.pageViews.current.toLocaleString()} | ${metrics.pageViews.previous.toLocaleString()} | ${this.formatChange(metrics.pageViews.percentageChange)} |
-| User Engagement Events | ${metrics.engagementEvents.current.toLocaleString()} | ${metrics.engagementEvents.previous.toLocaleString()} | ${this.formatChange(metrics.engagementEvents.percentageChange)} |
+| Google Analytics Page Views | ${metrics.pageViews.current.toLocaleString()} | ${metrics.pageViews.previous.toLocaleString()} | ${this.formatChange(metrics.pageViews.percentageChange)} |
+| Google Analytics User Engagement Events | ${metrics.engagementEvents.current.toLocaleString()} | ${metrics.engagementEvents.previous.toLocaleString()} | ${this.formatChange(metrics.engagementEvents.percentageChange)} |
 | Google Indexed Pages | ${metrics.indexedPages.toLocaleString()} | - | - |
-| Total Impressions | ${metrics.totalImpressions.current.toLocaleString()} | ${metrics.totalImpressions.previous.toLocaleString()} | ${this.formatChange(metrics.totalImpressions.percentageChange)} |
-| Total Clicks | ${metrics.totalClicks.current.toLocaleString()} | ${metrics.totalClicks.previous.toLocaleString()} | ${this.formatChange(metrics.totalClicks.percentageChange)} |
+| Google Total Impressions | ${metrics.totalImpressions.current.toLocaleString()} | ${metrics.totalImpressions.previous.toLocaleString()} | ${this.formatChange(metrics.totalImpressions.percentageChange)} |
+| Google Total Clicks | ${metrics.totalClicks.current.toLocaleString()} | ${metrics.totalClicks.previous.toLocaleString()} | ${this.formatChange(metrics.totalClicks.percentageChange)} |
 | Ahrefs Domain Rating (DR) | - | - | - |
 `;
   }
