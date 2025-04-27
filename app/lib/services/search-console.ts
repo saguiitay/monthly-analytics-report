@@ -43,7 +43,7 @@ export class SearchConsoleService {
     }
   }
 
-  async getTotalImpressions(startDate: Date, endDate: Date): Promise<number> {
+  async getTotalImpressions(startDate: Date, endDate: Date): Promise<{impressions: number, clicks: number}> {
     try {
       const response = await this.client.searchanalytics.query({
         siteUrl: this.siteUrl,
@@ -56,7 +56,11 @@ export class SearchConsoleService {
       });
 
       const impressions = response.data.rows?.[0]?.impressions;
-      return impressions ? Math.round(impressions) : 0;
+      const clicks = response.data.rows?.[0]?.clicks;
+      return {
+        impressions: impressions ? Math.round(impressions) : 0,
+        clicks: clicks ? Math.round(clicks) : 0,
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       console.error('Error fetching Search Console impressions:', JSON.stringify(error));

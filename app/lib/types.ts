@@ -17,6 +17,7 @@ export interface AnalyticsMetrics {
   engagementEvents: MetricWithChange;
   indexedPages: number;
   totalImpressions: MetricWithChange;
+  totalClicks: MetricWithChange;
   domainRating: number;
 }
 

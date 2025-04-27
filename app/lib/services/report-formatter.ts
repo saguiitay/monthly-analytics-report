@@ -18,6 +18,7 @@ export class ReportFormatter {
 | User Engagement Events | ${metrics.engagementEvents.current.toLocaleString()} | ${metrics.engagementEvents.previous.toLocaleString()} | ${this.formatChange(metrics.engagementEvents.percentageChange)} |
 | Google Indexed Pages | ${metrics.indexedPages.toLocaleString()} | - | - |
 | Total Impressions | ${metrics.totalImpressions.current.toLocaleString()} | ${metrics.totalImpressions.previous.toLocaleString()} | ${this.formatChange(metrics.totalImpressions.percentageChange)} |
+| Total Clicks | ${metrics.totalClicks.current.toLocaleString()} | ${metrics.totalClicks.previous.toLocaleString()} | ${this.formatChange(metrics.totalClicks.percentageChange)} |
 | Ahrefs Domain Rating (DR) | - | - | - |
 `;
   }

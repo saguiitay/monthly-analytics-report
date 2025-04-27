@@ -28,7 +28,7 @@ export class ReportGenerator {
     const periods = AnalyticsService.getLast30DaysPeriod();
     let currentPageViews = 0, previousPageViews = 0,
         currentEngagementEvents = 0, previousEngagementEvents = 0,
-        currentImpressions = 0, previousImpressions = 0,
+        currentImpressions = { impressions: 0, clicks: 0}, previousImpressions = { impressions: 0, clicks: 0},
         indexedPages = 0;
     const domainRating = -1;
 
@@ -97,9 +97,14 @@ export class ReportGenerator {
         },
         indexedPages,
         totalImpressions: {
-          current: currentImpressions,
-          previous: previousImpressions,
-          percentageChange: AnalyticsService.calculatePercentageChange(currentImpressions, previousImpressions)
+          current: currentImpressions.impressions,
+          previous: previousImpressions.impressions,
+          percentageChange: AnalyticsService.calculatePercentageChange(currentImpressions.impressions, previousImpressions.impressions)
+        },
+        totalClicks: {
+          current: currentImpressions.clicks,
+          previous: previousImpressions.clicks,
+          percentageChange: AnalyticsService.calculatePercentageChange(currentImpressions.clicks, previousImpressions.clicks)
         },
         domainRating,
       },
