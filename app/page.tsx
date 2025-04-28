@@ -59,6 +59,13 @@ export default function Home() {
         gscSiteUrl: 'sc-domain:binge-waste.com',
         domain: 'binge-waste.com'
       },
+      {
+        name: 'Cursive Generation',
+        url: 'https://cursive-generation.com',
+        gaPropertyId: '487230425',
+        gscSiteUrl: 'sc-domain:cursive-generation.com',
+        domain: 'cursive-generation.com'
+      },
     ];
 
     try {
