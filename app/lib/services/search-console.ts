@@ -1,6 +1,6 @@
 import { google, searchconsole_v1, Auth } from 'googleapis';
 import { GoogleAuth } from 'google-auth-library';
-import { ServiceAccountConfig } from '../types';
+import { SearchConsoleConfig } from '../types';
 import { format } from 'date-fns';
 
 export class SearchConsoleService {
@@ -12,7 +12,7 @@ export class SearchConsoleService {
     this.siteUrl = siteUrl;
   }
 
-  static async initialize(config: ServiceAccountConfig, siteUrl: string): Promise<SearchConsoleService> {
+  static async initialize(config: SearchConsoleConfig, siteUrl: string): Promise<SearchConsoleService> {
     try {
       const auth = new GoogleAuth({
         credentials: {

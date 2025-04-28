@@ -1,12 +1,12 @@
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
-import { ServiceAccountConfig } from '../types';
+import { GoogleAnalyticsConfig } from '../types';
 import { subDays, format } from 'date-fns';
 
 export class AnalyticsService {
   private static clientInstance: BetaAnalyticsDataClient | null = null;
   private static clientCredentials: { client_email: string, private_key: string } | null = null;
 
-  constructor(config: ServiceAccountConfig) {
+  constructor(config: GoogleAnalyticsConfig) {
     // Initialize static client if not already done
     if (!AnalyticsService.clientInstance || 
         !AnalyticsService.clientCredentials ||
@@ -57,11 +57,11 @@ export class AnalyticsService {
     return this.runReport(startDate, endDate, 'eventCount', propertyId);
   }
 
-  static getLast30DaysPeriod(): { 
+  static getLast30DaysPeriod(endDate: Date = new Date()): { 
     current: { startDate: Date; endDate: Date };
     previous: { startDate: Date; endDate: Date };
   } {
-    const currentEndDate = new Date();
+    const currentEndDate = endDate;
     const currentStartDate = subDays(currentEndDate, 30);
     const previousEndDate = subDays(currentStartDate, 1);
     const previousStartDate = subDays(previousEndDate, 30);

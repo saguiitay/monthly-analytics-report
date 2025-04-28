@@ -8,6 +8,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ markdown: string;  } | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [endDate, setEndDate] = useState<string>('');
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -76,7 +77,8 @@ export default function Home() {
         },
         body: JSON.stringify({
           projects,
-          title: 'Monthly Analytics Report'
+          title: 'Monthly Analytics Report',
+          endDate: endDate || undefined
         }),
       });
 
@@ -101,15 +103,30 @@ export default function Home() {
       </h1>
 
       <form onSubmit={handleSubmit} className="mb-8">
-        <button
-          type="submit"
-          disabled={loading}
-          className={`px-4 py-2 bg-blue-500 text-white rounded ${
-            loading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
-          }`}
-        >
-          {loading ? 'Generating...' : 'Generate Report'}
-        </button>
+        <div className="flex gap-4 items-center">
+          <div className="flex flex-col gap-2">
+            <label htmlFor="endDate" className="text-sm font-medium text-gray-700">
+              End Date
+            </label>
+            <input
+              id="endDate"
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="px-4 py-2 border rounded"
+              aria-label="Report end date"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className={`px-4 py-2 bg-blue-500 text-white rounded ${
+              loading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
+            }`}
+          >
+            {loading ? 'Generating...' : 'Generate Report'}
+          </button>
+        </div>
       </form>
 
       {error && (

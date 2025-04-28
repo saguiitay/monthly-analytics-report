@@ -5,7 +5,7 @@ import { ProjectConfig } from '../../lib/types';
 
 export async function POST(request: NextRequest) {
   try {
-    const { projects } = await request.json();
+    const { projects, endDate } = await request.json();
 
     if (!Array.isArray(projects)) {
       return NextResponse.json(
@@ -37,16 +37,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Initialize the report generator
-    const generator = new ReportGenerator(
-      {
-        clientEmail: process.env.GOOGLE_CLIENT_EMAIL!,
-        privateKey: process.env.GOOGLE_PRIVATE_KEY!,
-        propertyId: projects[0].gaPropertyId // We'll use the first project's property ID
-      }
-    );
+    const generator = new ReportGenerator();
 
     // Generate reports for all projects
-    const reports = await generator.generateReports(projects as ProjectConfig[]);
+    const endDateObj = endDate ? new Date(endDate) : undefined;
+    const reports = await generator.generateReports(projects as ProjectConfig[], endDateObj);
 
     // Format the reports
     const markdown = ReportFormatter.formatReport(reports);

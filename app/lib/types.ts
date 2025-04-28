@@ -30,7 +30,12 @@ export interface ProjectReport {
   };
 }
 
-export interface ServiceAccountConfig {
+export interface SearchConsoleConfig {
+  clientEmail: string;
+  privateKey: string;
+}
+
+export interface GoogleAnalyticsConfig {
   clientEmail: string;
   privateKey: string;
   propertyId: string;
