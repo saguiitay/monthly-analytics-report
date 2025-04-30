@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ReportGenerator } from '../../lib/services/report-generator';
 import { ReportFormatter } from '../../lib/services/report-formatter';
-import { ProjectConfig } from '../../lib/types';
+import { ProjectConfig, ProjectReport } from '../../lib/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,11 +45,12 @@ export async function POST(request: NextRequest) {
 
     // Format the reports
     const markdown = ReportFormatter.formatReport(reports);
-    //const html = ReportFormatter.markdownToHtml(markdown);
+    const summary = reportSummary(reports);
     //const rawHtml = ReportFormatter.markdownToRawHtml(markdown);
 
     return NextResponse.json({
       markdown,
+      summary
       //rawHtml,
       //html,
     });
@@ -60,6 +61,24 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function reportSummary(reports: ProjectReport[]): string { 
+  // calculate total page views
+  const totalPageViews = reports.map(r => r.metrics.pageViews.current).reduce((total, r) => { return total + r; });
+  const previousTotalPageViews = reports.map(r => r.metrics.pageViews.previous).reduce((total, r) => { return total + r; });
+
+  const totalImpressions = reports.map(r => r.metrics.totalImpressions.current).reduce((total, r) => { return total + r; });
+  const previousTotalImpressions = reports.map(r => r.metrics.totalImpressions.previous).reduce((total, r) => { return total + r; });
+
+  const totalClicks = reports.map(r => r.metrics.totalClicks.current).reduce((total, r) => { return total + r; });
+  const previousTotalClicks = reports.map(r => r.metrics.totalClicks.previous).reduce((total, r) => { return total + r; });
+
+  return `
+Total PageViews: ${totalPageViews}, Previous Total PageViews: ${previousTotalPageViews}
+Total Impressions: ${totalImpressions}, Previous Total Impressions: ${previousTotalImpressions}
+Total Clicks: ${totalClicks}, Previous Total Clicks: ${previousTotalClicks}
+`;
 }
 
 export async function GET() {

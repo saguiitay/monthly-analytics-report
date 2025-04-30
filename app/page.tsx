@@ -6,9 +6,10 @@ import { ProjectConfig } from './lib/types';
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ markdown: string;  } | null>(null);
+  const [result, setResult] = useState<{ markdown: string, summary :string  } | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [endDate, setEndDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [resultSummary, setResultSummary] = useState<string>('');
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -148,8 +149,16 @@ export default function Home() {
 
       {result && (
         <div>
-          <h2 className="text-2xl font-bold mb-4">Report Generated</h2>
+
+          <h2 className="text-2xl font-bold mb-4">Summary</h2>
+          <div className="mb-8">
+            <pre className="p-4 bg-gray-100 rounded overflow-x-auto">
+              {result.summary}
+            </pre>
+          </div>
+
           
+          <h2 className="text-2xl font-bold mb-4">Report Generated</h2>
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xl font-semibold">Markdown</h3>
