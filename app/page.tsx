@@ -152,15 +152,7 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="mt-4 p-4 bg-blue-50 rounded">
-          <p className="text-sm text-blue-700 mb-2">
-            <strong>Report Types:</strong>
-          </p>
-          <ul className="text-xs text-blue-600 space-y-1">
-            <li><strong>Summary:</strong> Basic metrics table with page views, engagement, impressions, and clicks</li>
-            <li><strong>Detailed:</strong> Comprehensive analysis including traffic sources, geographic data, search performance issues, user engagement patterns, and strategic problems</li>
-          </ul>
-        </div>
+        
       </form>
 
       {error && (

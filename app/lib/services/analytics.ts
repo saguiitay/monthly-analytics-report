@@ -88,7 +88,7 @@ export class AnalyticsService {
             endOffset: 7,
           },
         },
-        dimensions: [{ name: 'cohortNthDay' }],
+        dimensions: [{ name: 'cohort' }, { name: 'cohortNthDay' }],
         metrics: [{ name: 'cohortActiveUsers' }],
       });
 
@@ -98,7 +98,7 @@ export class AnalyticsService {
 
       if (cohortResponse.rows) {
         for (const row of cohortResponse.rows) {
-          const cohortDay = row.dimensionValues?.[0]?.value;
+          const cohortDay = row.dimensionValues?.[1]?.value; // cohortNthDay is now the second dimension
           const users = parseInt(row.metricValues?.[0]?.value || '0', 10);
           
           if (cohortDay === '0') {

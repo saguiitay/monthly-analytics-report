@@ -79,12 +79,19 @@ export interface UserEngagementData {
 
 export interface DetailedTrafficMetrics {
   activeUsers: number;
+  previousActiveUsers?: number;
   userRetention: {
     day1: number;
     day7: number;
   };
+  previousUserRetention?: {
+    day1: number;
+    day7: number;
+  };
   trafficSources: TrafficSource[];
+  previousTrafficSources?: TrafficSource[];
   geographicDistribution: GeographicData[];
+  previousGeographicDistribution?: GeographicData[];
 }
 
 export interface DetailedSearchMetrics {
@@ -92,10 +99,18 @@ export interface DetailedSearchMetrics {
     desktop: number;
     mobile: number;
   };
+  previousAveragePosition?: {
+    desktop: number;
+    mobile: number;
+  };
   clickThroughRate: number;
+  previousClickThroughRate?: number;
   totalImpressions: number;
+  previousTotalImpressions?: number;
   totalClicks: number;
+  previousTotalClicks?: number;
   topQueries: SearchQuery[];
+  previousTopQueries?: SearchQuery[];
 }
 
 export interface DetailedAnalyticsMetrics {
@@ -104,9 +119,13 @@ export interface DetailedAnalyticsMetrics {
   pagePerformance: {
     topViewedPages: PagePerformance[];
     topSearchPages: PagePerformance[];
+    previousTopViewedPages?: PagePerformance[];
+    previousTopSearchPages?: PagePerformance[];
   };
   userEngagement: UserEngagementData;
+  previousUserEngagement?: UserEngagementData;
   events: EventData[];
+  previousEvents?: EventData[];
   strategicProblems: string[];
 }
 

@@ -9,6 +9,27 @@ export class ReportFormatter {
     return `${sign}${change.toFixed(1)}%`;
   }
 
+  /**
+   * Calculate percentage change between current and previous values
+   */
+  private static calculateChange(current: number, previous: number): number {
+    if (previous === 0) return current === 0 ? 0 : 100;
+    return ((current - previous) / previous) * 100;
+  }
+
+  /**
+   * Format change with value comparison
+   */
+  private static formatValueWithChange(current: number, previous?: number, suffix: string = ''): string {
+    if (previous === undefined) {
+      return `${current.toLocaleString()}${suffix}`;
+    }
+    const change = this.calculateChange(current, previous);
+    const changeStr = this.formatChange(change);
+    const arrow = change > 0 ? '↗️' : change < 0 ? '↘️' : '➡️';
+    return `${current.toLocaleString()}${suffix} (${changeStr} ${arrow} from ${previous.toLocaleString()}${suffix})`;
+  }
+
   private static formatProjectTable(report: ProjectReport): string {
     const { metrics } = report;
     
@@ -56,17 +77,21 @@ Visit website: [${project.name}](${project.url})
 
     // Traffic & Engagement section
     markdown += `### Traffic & Engagement *(${period.startDate} - ${period.endDate})*
-- **Active Users**: ${metrics.traffic.activeUsers.toLocaleString()} total users
-- **User Retention**: ${metrics.traffic.userRetention.day1.toFixed(2)}% day-1 retention, ${metrics.traffic.userRetention.day7.toFixed(2)}% day-7 retention${metrics.traffic.userRetention.day7 === 0 ? ' (critical issue)' : ''}
+- **Active Users**: ${this.formatValueWithChange(metrics.traffic.activeUsers, metrics.traffic.previousActiveUsers)} total users
+- **User Retention**: ${metrics.traffic.userRetention.day1.toFixed(2)}% day-1 retention${metrics.traffic.previousUserRetention ? ` (${this.formatChange(this.calculateChange(metrics.traffic.userRetention.day1, metrics.traffic.previousUserRetention.day1))})` : ''}, ${metrics.traffic.userRetention.day7.toFixed(2)}% day-7 retention${metrics.traffic.previousUserRetention ? ` (${this.formatChange(this.calculateChange(metrics.traffic.userRetention.day7, metrics.traffic.previousUserRetention.day7))})` : ''}${metrics.traffic.userRetention.day7 === 0 ? ' (critical issue)' : ''}
 - **Traffic Sources**: 
-${metrics.traffic.trafficSources.map(source => 
-  `  - ${source.source}: ${source.users.toLocaleString()} users (${source.percentage.toFixed(0)}%)`
-).join('\n')}
+${metrics.traffic.trafficSources.map(source => {
+      const prevSource = metrics.traffic.previousTrafficSources?.find(p => p.source === source.source);
+      const changeStr = prevSource ? ` (${this.formatChange(this.calculateChange(source.users, prevSource.users))})` : '';
+      return `  - ${source.source}: ${source.users.toLocaleString()} users (${source.percentage.toFixed(0)}%)${changeStr}`;
+    }).join('\n')}
 - **Geographic Distribution**:
-${metrics.traffic.geographicDistribution.slice(0, 5).map(geo => 
-  `  - ${geo.country}: ${geo.users.toLocaleString()} users (${geo.percentage.toFixed(0)}%)`
-).join('\n')}${metrics.traffic.geographicDistribution.length > 5 ? 
-  `\n  - Other: ${metrics.traffic.geographicDistribution.slice(5).reduce((sum, geo) => sum + geo.users, 0).toLocaleString()} users (${metrics.traffic.geographicDistribution.slice(5).reduce((sum, geo) => sum + geo.percentage, 0).toFixed(0)}%)` : ''}
+${metrics.traffic.geographicDistribution.slice(0, 5).map(geo => {
+      const prevGeo = metrics.traffic.previousGeographicDistribution?.find(p => p.country === geo.country);
+      const changeStr = prevGeo ? ` (${this.formatChange(this.calculateChange(geo.users, prevGeo.users))})` : '';
+      return `  - ${geo.country}: ${geo.users.toLocaleString()} users (${geo.percentage.toFixed(0)}%)${changeStr}`;
+    }).join('\n')}${metrics.traffic.geographicDistribution.length > 5 ? 
+      `\n  - Other: ${metrics.traffic.geographicDistribution.slice(5).reduce((sum, geo) => sum + geo.users, 0).toLocaleString()} users (${metrics.traffic.geographicDistribution.slice(5).reduce((sum, geo) => sum + geo.percentage, 0).toFixed(0)}%)` : ''}
 
 `;
 
@@ -76,9 +101,10 @@ ${metrics.traffic.geographicDistribution.slice(0, 5).map(geo =>
     const ctr = metrics.search.clickThroughRate;
     
     markdown += `### Critical Search Performance Issues *(Last 28 Days)*
-- **Average Search Position**: ${avgDesktopPos.toFixed(2)} (Desktop), ${avgMobilePos.toFixed(2)} (Mobile)${(avgDesktopPos > 80 || avgMobilePos > 80) ? ' - **URGENT**' : ''}
-- **Click-Through Rate**: ${ctr.toFixed(2)}% (${metrics.search.totalClicks} click${metrics.search.totalClicks !== 1 ? 's' : ''} from ${metrics.search.totalImpressions.toLocaleString()} impressions)${ctr < 2 ? ' - **CRITICAL**' : ''}
-- **Search Impressions**: ${metrics.search.totalImpressions.toLocaleString()} total${metrics.search.totalImpressions < 1000 ? ' (very low visibility)' : ''}
+- **Average Search Position**: ${avgDesktopPos.toFixed(2)} (Desktop)${metrics.search.previousAveragePosition ? ` (${this.formatChange(this.calculateChange(avgDesktopPos, metrics.search.previousAveragePosition.desktop))})` : ''}, ${avgMobilePos.toFixed(2)} (Mobile)${metrics.search.previousAveragePosition ? ` (${this.formatChange(this.calculateChange(avgMobilePos, metrics.search.previousAveragePosition.mobile))})` : ''}${(avgDesktopPos > 80 || avgMobilePos > 80) ? ' - **URGENT**' : ''}
+- **Click-Through Rate**: ${ctr.toFixed(2)}%${metrics.search.previousClickThroughRate ? ` (${this.formatChange(this.calculateChange(ctr, metrics.search.previousClickThroughRate))})` : ''}${ctr < 2 ? ' - **CRITICAL**' : ''}
+- **Search Clicks**: ${metrics.search.totalClicks.toLocaleString()}${metrics.search.previousTotalClicks ? ` (${this.formatChange(this.calculateChange(metrics.search.totalClicks, metrics.search.previousTotalClicks))})` : ''} clicks
+- **Search Impressions**: ${metrics.search.totalImpressions.toLocaleString()}${metrics.search.previousTotalImpressions ? ` (${this.formatChange(this.calculateChange(metrics.search.totalImpressions, metrics.search.previousTotalImpressions))})` : ''} impressions${metrics.search.totalImpressions < 1000 ? ' (very low visibility)' : ''}
 ${metrics.search.topQueries.length > 0 ? `- **Top Performing Query**: "${metrics.search.topQueries[0].query}" (${metrics.search.topQueries[0].clicks} click${metrics.search.topQueries[0].clicks !== 1 ? 's' : ''}, ${metrics.search.topQueries[0].ctr.toFixed(0)}% CTR, position ${metrics.search.topQueries[0].position.toFixed(0)})` : ''}
 
 `;
@@ -91,7 +117,9 @@ ${metrics.search.topQueries.length > 0 ? `- **Top Performing Query**: "${metrics
       markdown += `**Pages Receiving Views**:
 ${metrics.pagePerformance.topViewedPages.map(page => {
         const urlDisplay = page.url ? ` (${page.url})` : '';
-        return `- ${page.page}${urlDisplay}: ${page.views.toLocaleString()} views`;
+        const prevPage = metrics.pagePerformance.previousTopViewedPages?.find(p => p.page === page.page || p.url === page.url);
+        const changeStr = prevPage ? ` (${this.formatChange(this.calculateChange(page.views, prevPage.views))})` : '';
+        return `- ${page.page}${urlDisplay}: ${page.views.toLocaleString()} views${changeStr}`;
       }).join('\n')}
 
 `;
@@ -101,7 +129,10 @@ ${metrics.pagePerformance.topViewedPages.map(page => {
       markdown += `**Search Console Top Pages** *(Impressions)*:
 ${metrics.pagePerformance.topSearchPages.map(page => {
         const urlDisplay = page.url ? ` (${page.url})` : '';
-        return `- ${page.page}${urlDisplay}: ${page.impressions?.toLocaleString() || 0} impressions, ${page.clicks?.toLocaleString() || 0} click${(page.clicks || 0) !== 1 ? 's' : ''}`;
+        const prevPage = metrics.pagePerformance.previousTopSearchPages?.find(p => p.page === page.page || p.url === page.url);
+        const impChange = prevPage?.impressions ? ` (${this.formatChange(this.calculateChange(page.impressions || 0, prevPage.impressions))})` : '';
+        const clickChange = prevPage?.clicks ? ` (${this.formatChange(this.calculateChange(page.clicks || 0, prevPage.clicks))})` : '';
+        return `- ${page.page}${urlDisplay}: ${page.impressions?.toLocaleString() || 0} impressions${impChange}, ${page.clicks?.toLocaleString() || 0} click${(page.clicks || 0) !== 1 ? 's' : ''}${clickChange}`;
       }).join('\n')}
 
 `;
@@ -146,9 +177,11 @@ ${metrics.search.topQueries.map(query =>
     // Events section
     if (metrics.events.length > 0) {
       markdown += `### Top Events
-${metrics.events.map(event => 
-        `- **${event.eventName}**: ${event.eventCount.toLocaleString()} events (${event.percentage.toFixed(1)}%)`
-      ).join('\n')}
+${metrics.events.map(event => {
+        const prevEvent = metrics.previousEvents?.find(p => p.eventName === event.eventName);
+        const changeStr = prevEvent ? ` (${this.formatChange(this.calculateChange(event.eventCount, prevEvent.eventCount))})` : '';
+        return `- **${event.eventName}**: ${event.eventCount.toLocaleString()} events (${event.percentage.toFixed(1)}%)${changeStr}`;
+      }).join('\n')}
 
 `;
     }

@@ -130,7 +130,7 @@ export class ReportGenerator {
     const periods = AnalyticsService.getLast30DaysPeriod(endDate);
 
     try {
-      // Fetch all detailed metrics in parallel
+      // Fetch all detailed metrics in parallel for both current and previous periods
       const [
         activeUsers,
         userRetention,
@@ -143,8 +143,22 @@ export class ReportGenerator {
         totalImpressions,
         topQueries,
         topSearchPages,
-        topEvents
+        topEvents,
+        // Previous period data
+        previousActiveUsers,
+        previousUserRetention,
+        previousTrafficSources,
+        previousGeographicDistribution,
+        previousTopViewedPages,
+        previousUserEngagement,
+        previousAveragePosition,
+        previousClickThroughRate,
+        previousTotalImpressions,
+        previousTopQueries,
+        previousTopSearchPages,
+        previousTopEvents
       ] = await Promise.all([
+        // Current period
         analytics.getActiveUsers(periods.current.startDate, periods.current.endDate, project.gaPropertyId),
         analytics.getUserRetention(periods.current.startDate, periods.current.endDate, project.gaPropertyId),
         analytics.getTrafficSources(periods.current.startDate, periods.current.endDate, project.gaPropertyId),
@@ -156,29 +170,55 @@ export class ReportGenerator {
         searchConsole.getTotalImpressions(periods.current.startDate, periods.current.endDate),
         searchConsole.getTopQueries(periods.current.startDate, periods.current.endDate, 15),
         searchConsole.getTopSearchPages(periods.current.startDate, periods.current.endDate, 10),
-        analytics.getTopEvents(periods.current.startDate, periods.current.endDate, project.gaPropertyId)
+        analytics.getTopEvents(periods.current.startDate, periods.current.endDate, project.gaPropertyId),
+        // Previous period
+        analytics.getActiveUsers(periods.previous.startDate, periods.previous.endDate, project.gaPropertyId),
+        analytics.getUserRetention(periods.previous.startDate, periods.previous.endDate, project.gaPropertyId),
+        analytics.getTrafficSources(periods.previous.startDate, periods.previous.endDate, project.gaPropertyId),
+        analytics.getGeographicDistribution(periods.previous.startDate, periods.previous.endDate, project.gaPropertyId),
+        analytics.getTopViewedPages(periods.previous.startDate, periods.previous.endDate, project.gaPropertyId),
+        analytics.getUserEngagementData(periods.previous.startDate, periods.previous.endDate, project.gaPropertyId),
+        searchConsole.getAveragePosition(periods.previous.startDate, periods.previous.endDate),
+        searchConsole.getClickThroughRate(periods.previous.startDate, periods.previous.endDate),
+        searchConsole.getTotalImpressions(periods.previous.startDate, periods.previous.endDate),
+        searchConsole.getTopQueries(periods.previous.startDate, periods.previous.endDate, 15),
+        searchConsole.getTopSearchPages(periods.previous.startDate, periods.previous.endDate, 10),
+        analytics.getTopEvents(periods.previous.startDate, periods.previous.endDate, project.gaPropertyId)
       ]);
 
       const detailedMetrics: DetailedAnalyticsMetrics = {
         traffic: {
           activeUsers,
+          previousActiveUsers,
           userRetention,
+          previousUserRetention,
           trafficSources,
-          geographicDistribution
+          previousTrafficSources,
+          geographicDistribution,
+          previousGeographicDistribution
         },
         search: {
           averagePosition,
+          previousAveragePosition,
           clickThroughRate,
+          previousClickThroughRate,
           totalImpressions: totalImpressions.impressions,
+          previousTotalImpressions: previousTotalImpressions.impressions,
           totalClicks: totalImpressions.clicks,
-          topQueries
+          previousTotalClicks: previousTotalImpressions.clicks,
+          topQueries,
+          previousTopQueries
         },
         pagePerformance: {
           topViewedPages,
-          topSearchPages
+          topSearchPages,
+          previousTopViewedPages,
+          previousTopSearchPages
         },
         userEngagement,
+        previousUserEngagement,
         events: topEvents,
+        previousEvents: previousTopEvents,
         strategicProblems: []
       };
 
