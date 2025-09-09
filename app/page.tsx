@@ -1,15 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { ProjectConfig } from './lib/types';
+import { ProjectConfig, ReportType } from './lib/types';
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ markdown: string, summary :string  } | null>(null);
+  const [result, setResult] = useState<{ markdown: string, summary: string, reportType: ReportType } | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [resultSummary, setResultSummary] = useState<string>('');
+  const [reportType, setReportType] = useState<ReportType>('summary');
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -54,19 +54,26 @@ export default function Home() {
         gscSiteUrl: 'sc-domain:personal-tests.com',
         domain: 'personal-tests.com'
       },
-      {
-        name: 'Binge Waste',
-        url: 'https://binge-waste.com',
-        gaPropertyId: '440738598',
-        gscSiteUrl: 'sc-domain:binge-waste.com',
-        domain: 'binge-waste.com'
-      },
+      // {
+      //   name: 'Binge Waste',
+      //   url: 'https://binge-waste.com',
+      //   gaPropertyId: '440738598',
+      //   gscSiteUrl: 'sc-domain:binge-waste.com',
+      //   domain: 'binge-waste.com'
+      // },
       {
         name: 'Cursive Generation',
         url: 'https://cursive-generation.com',
         gaPropertyId: '487230425',
         gscSiteUrl: 'sc-domain:cursive-generation.com',
         domain: 'cursive-generation.com'
+      },
+      {
+        name: 'Bike Size',
+        url: 'https://bike-size.com',
+        gaPropertyId: '488843706',
+        gscSiteUrl: 'sc-domain:bike-size.com',
+        domain: 'bike-size.com'
       },
     ];
 
@@ -79,7 +86,8 @@ export default function Home() {
         body: JSON.stringify({
           projects,
           title: 'Monthly Analytics Report',
-          endDate: endDate || undefined
+          endDate: endDate || undefined,
+          reportType
         }),
       });
 
@@ -104,7 +112,22 @@ export default function Home() {
       </h1>
 
       <form onSubmit={handleSubmit} className="mb-8">
-        <div className="flex gap-4 items-center">
+        <div className="flex gap-4 items-end">
+          <div className="flex flex-col gap-2">
+            <label htmlFor="reportType" className="text-sm font-medium text-gray-700">
+              Report Type
+            </label>
+            <select
+              id="reportType"
+              value={reportType}
+              onChange={(e) => setReportType(e.target.value as ReportType)}
+              className="px-4 py-2 border rounded"
+              aria-label="Report type"
+            >
+              <option value="summary">Summary Report</option>
+              <option value="detailed">Detailed Report</option>
+            </select>
+          </div>
           <div className="flex flex-col gap-2">
             <label htmlFor="endDate" className="text-sm font-medium text-gray-700">
               End Date
@@ -121,12 +144,22 @@ export default function Home() {
           <button
             type="submit"
             disabled={loading}
-            className={`px-4 py-2 bg-blue-500 text-white rounded ${
+            className={`px-6 py-2 bg-blue-500 text-white rounded ${
               loading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
             }`}
           >
-            {loading ? 'Generating...' : 'Generate Report'}
+            {loading ? 'Generating...' : `Generate ${reportType === 'detailed' ? 'Detailed' : 'Summary'} Report`}
           </button>
+        </div>
+
+        <div className="mt-4 p-4 bg-blue-50 rounded">
+          <p className="text-sm text-blue-700 mb-2">
+            <strong>Report Types:</strong>
+          </p>
+          <ul className="text-xs text-blue-600 space-y-1">
+            <li><strong>Summary:</strong> Basic metrics table with page views, engagement, impressions, and clicks</li>
+            <li><strong>Detailed:</strong> Comprehensive analysis including traffic sources, geographic data, search performance issues, user engagement patterns, and strategic problems</li>
+          </ul>
         </div>
       </form>
 
@@ -140,7 +173,6 @@ export default function Home() {
               <li>Google Analytics Data API is enabled in your Google Cloud Console</li>
               <li>Search Console API is enabled and the service account has access</li>
               <li>Service account credentials are correctly formatted in .env.local</li>
-              <li>Ahrefs API token is valid</li>
               <li>Project configuration (propertyId, siteUrl, domain) is correct</li>
             </ul>
           </div>
@@ -149,19 +181,20 @@ export default function Home() {
 
       {result && (
         <div>
+          <h2 className="text-2xl font-bold mb-4">
+            {result.reportType === 'detailed' ? 'Detailed Report' : 'Summary Report'} Generated
+          </h2>
 
-          <h2 className="text-2xl font-bold mb-4">Summary</h2>
           <div className="mb-8">
-            <pre className="p-4 bg-gray-100 rounded overflow-x-auto">
+            <h3 className="text-xl font-semibold mb-2">Summary</h3>
+            <pre className="p-4 bg-gray-100 rounded overflow-x-auto text-sm">
               {result.summary}
             </pre>
           </div>
 
-          
-          <h2 className="text-2xl font-bold mb-4">Report Generated</h2>
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xl font-semibold">Markdown</h3>
+              <h3 className="text-xl font-semibold">Markdown Report</h3>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(result.markdown);
@@ -174,10 +207,10 @@ export default function Home() {
                   <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
-                {copySuccess ? 'Copied!' : 'Copy Text'}
+                {copySuccess ? 'Copied!' : 'Copy Markdown'}
               </button>
             </div>
-            <pre className="p-4 bg-gray-100 rounded overflow-x-auto">
+            <pre className="p-4 bg-gray-100 rounded overflow-x-auto text-sm max-h-96 overflow-y-auto">
               {result.markdown}
             </pre>
           </div>

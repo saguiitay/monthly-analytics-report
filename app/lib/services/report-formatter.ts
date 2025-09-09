@@ -1,4 +1,4 @@
-import { ProjectReport } from '../types';
+import { ProjectReport, DetailedProjectReport } from '../types';
 
 export class ReportFormatter {
   /**
@@ -16,12 +16,13 @@ export class ReportFormatter {
 |:------|--------:|---------:|--------:|
 | Google Analytics Page Views | ${metrics.pageViews.current.toLocaleString()} | ${metrics.pageViews.previous.toLocaleString()} | ${this.formatChange(metrics.pageViews.percentageChange)} |
 | Google Analytics User Engagement Events | ${metrics.engagementEvents.current.toLocaleString()} | ${metrics.engagementEvents.previous.toLocaleString()} | ${this.formatChange(metrics.engagementEvents.percentageChange)} |
-| Google Indexed Pages | ${metrics.indexedPages.toLocaleString()} | - | - |
 | Google Total Impressions | ${metrics.totalImpressions.current.toLocaleString()} | ${metrics.totalImpressions.previous.toLocaleString()} | ${this.formatChange(metrics.totalImpressions.percentageChange)} |
 | Google Total Clicks | ${metrics.totalClicks.current.toLocaleString()} | ${metrics.totalClicks.previous.toLocaleString()} | ${this.formatChange(metrics.totalClicks.percentageChange)} |
-| Ahrefs Domain Rating (DR) | - | - | - |
 `;
   }
+
+// | Google Indexed Pages | ${metrics.indexedPages.toLocaleString()} | - | - |
+// | Ahrefs Domain Rating (DR) | - | - | - |
 
   /**
    * Generate a complete Markdown report for a project
@@ -42,6 +43,128 @@ ${ReportFormatter.formatProjectTable(report)}
   }
 
   /**
+   * Generate a detailed Markdown report for a project
+   */
+  private static formatDetailedProjectReport(report: DetailedProjectReport): string {
+    const { project, metrics, period } = report;
+    
+    let markdown = `## ${project.name}
+
+Visit website: [${project.name}](${project.url})
+
+`;
+
+    // Traffic & Engagement section
+    markdown += `### Traffic & Engagement *(${period.startDate} - ${period.endDate})*
+- **Active Users**: ${metrics.traffic.activeUsers.toLocaleString()} total users
+- **User Retention**: ${metrics.traffic.userRetention.day1.toFixed(2)}% day-1 retention, ${metrics.traffic.userRetention.day7.toFixed(2)}% day-7 retention${metrics.traffic.userRetention.day7 === 0 ? ' (critical issue)' : ''}
+- **Traffic Sources**: 
+${metrics.traffic.trafficSources.map(source => 
+  `  - ${source.source}: ${source.users.toLocaleString()} users (${source.percentage.toFixed(0)}%)`
+).join('\n')}
+- **Geographic Distribution**:
+${metrics.traffic.geographicDistribution.slice(0, 5).map(geo => 
+  `  - ${geo.country}: ${geo.users.toLocaleString()} users (${geo.percentage.toFixed(0)}%)`
+).join('\n')}${metrics.traffic.geographicDistribution.length > 5 ? 
+  `\n  - Other: ${metrics.traffic.geographicDistribution.slice(5).reduce((sum, geo) => sum + geo.users, 0).toLocaleString()} users (${metrics.traffic.geographicDistribution.slice(5).reduce((sum, geo) => sum + geo.percentage, 0).toFixed(0)}%)` : ''}
+
+`;
+
+    // Critical Search Performance Issues section
+    const avgDesktopPos = metrics.search.averagePosition.desktop;
+    const avgMobilePos = metrics.search.averagePosition.mobile;
+    const ctr = metrics.search.clickThroughRate;
+    
+    markdown += `### Critical Search Performance Issues *(Last 28 Days)*
+- **Average Search Position**: ${avgDesktopPos.toFixed(2)} (Desktop), ${avgMobilePos.toFixed(2)} (Mobile)${(avgDesktopPos > 80 || avgMobilePos > 80) ? ' - **URGENT**' : ''}
+- **Click-Through Rate**: ${ctr.toFixed(2)}% (${metrics.search.totalClicks} click${metrics.search.totalClicks !== 1 ? 's' : ''} from ${metrics.search.totalImpressions.toLocaleString()} impressions)${ctr < 2 ? ' - **CRITICAL**' : ''}
+- **Search Impressions**: ${metrics.search.totalImpressions.toLocaleString()} total${metrics.search.totalImpressions < 1000 ? ' (very low visibility)' : ''}
+${metrics.search.topQueries.length > 0 ? `- **Top Performing Query**: "${metrics.search.topQueries[0].query}" (${metrics.search.topQueries[0].clicks} click${metrics.search.topQueries[0].clicks !== 1 ? 's' : ''}, ${metrics.search.topQueries[0].ctr.toFixed(0)}% CTR, position ${metrics.search.topQueries[0].position.toFixed(0)})` : ''}
+
+`;
+
+    // Page Performance Analysis section
+    markdown += `### Page Performance Analysis
+`;
+
+    if (metrics.pagePerformance.topViewedPages.length > 0) {
+      markdown += `**Pages Receiving Views**:
+${metrics.pagePerformance.topViewedPages.map(page => {
+        const urlDisplay = page.url ? ` (${page.url})` : '';
+        return `- ${page.page}${urlDisplay}: ${page.views.toLocaleString()} views`;
+      }).join('\n')}
+
+`;
+    }
+
+    if (metrics.pagePerformance.topSearchPages.length > 0) {
+      markdown += `**Search Console Top Pages** *(Impressions)*:
+${metrics.pagePerformance.topSearchPages.map(page => {
+        const urlDisplay = page.url ? ` (${page.url})` : '';
+        return `- ${page.page}${urlDisplay}: ${page.impressions?.toLocaleString() || 0} impressions, ${page.clicks?.toLocaleString() || 0} click${(page.clicks || 0) !== 1 ? 's' : ''}`;
+      }).join('\n')}
+
+`;
+    }
+
+    // Search Console Top Queries section
+    if (metrics.search.topQueries.length > 0) {
+      markdown += `**Search Console Top Queries**:
+${metrics.search.topQueries.map(query => 
+        `- "${query.query}": ${query.impressions.toLocaleString()} impressions, ${query.clicks} click${query.clicks !== 1 ? 's' : ''} (${query.ctr.toFixed(1)}% CTR, avg position ${query.position.toFixed(0)})`
+      ).join('\n')}
+
+`;
+    }
+
+    // User Engagement Patterns section
+    if (metrics.userEngagement.peakEngagementDays.length > 0 || metrics.userEngagement.averageEngagementTime > 0) {
+      markdown += `### User Engagement Patterns
+`;
+      
+      if (metrics.userEngagement.peakEngagementDays.length > 0) {
+        const peakDays = metrics.userEngagement.peakEngagementDays.slice(0, 2).map(date => {
+          const d = new Date(date);
+          return d.getDate();
+        }).join('-');
+        markdown += `- **Peak Engagement**: Days ${peakDays} with ${Math.round(metrics.userEngagement.sessionQuality.max)}+ second average engagement time\n`;
+      }
+      
+      markdown += `- **Platform**: 100% web traffic
+- **Session Quality**: Highly variable (${Math.round(metrics.userEngagement.sessionQuality.min)}-${Math.round(metrics.userEngagement.sessionQuality.max)} seconds average engagement)
+`;
+
+      if (metrics.traffic.geographicDistribution.length > 0) {
+        const topCountries = metrics.traffic.geographicDistribution.slice(0, 3).map(geo => geo.country).join(', ');
+        markdown += `- **Geographic Performance**: Strong in ${topCountries} markets
+`;
+      }
+
+      markdown += '\n';
+    }
+
+    // Events section
+    if (metrics.events.length > 0) {
+      markdown += `### Top Events
+${metrics.events.map(event => 
+        `- **${event.eventName}**: ${event.eventCount.toLocaleString()} events (${event.percentage.toFixed(1)}%)`
+      ).join('\n')}
+
+`;
+    }
+
+    // Strategic Problems section
+    if (metrics.strategicProblems.length > 0) {
+      markdown += `### Strategic Issues
+${metrics.strategicProblems.map(problem => `- **Problem**: ${problem}`).join('\n')}
+
+`;
+    }
+
+    return markdown;
+  }
+
+  /**
    * Generate a complete Markdown report for multiple projects
    */
   static formatReport(reports: ProjectReport[]): string {    
@@ -52,6 +175,50 @@ ${reports.map(report => ReportFormatter.formatProjectReport(report)).join('\n\n'
 `;
 
     return markdownReport;
+  }
+
+  /**
+   * Generate detailed Markdown reports for multiple projects
+   */
+  static formatDetailedReport(reports: DetailedProjectReport[]): string {    
+    const markdownReport = `# Detailed Analytics Report
+
+Period: ${reports[0].period.startDate} to ${reports[0].period.endDate}
+
+${reports.map(report => ReportFormatter.formatDetailedProjectReport(report)).join('\n---\n\n')}
+`;
+
+    return markdownReport;
+  }
+
+  /**
+   * Analyze metrics and identify strategic problems
+   */
+  static identifyStrategicProblems(metrics: any): string[] {
+    const problems: string[] = [];
+    
+    // Search performance issues
+    const avgPos = (metrics.search.averagePosition.desktop + metrics.search.averagePosition.mobile) / 2;
+    if (avgPos > 80) {
+      problems.push(`Positions ${Math.round(metrics.search.averagePosition.desktop)}-${Math.round(metrics.search.averagePosition.mobile)} across all pages, ${metrics.search.clickThroughRate.toFixed(2)}% CTR (industry standard is 2-3%)`);
+    }
+    
+    // CTR issues
+    if (metrics.search.clickThroughRate < 2) {
+      problems.push(`Only ${metrics.search.totalClicks} click${metrics.search.totalClicks !== 1 ? 's' : ''} from ${metrics.search.totalImpressions} impressions (${metrics.search.clickThroughRate.toFixed(2)}% vs 2-3% industry standard)`);
+    }
+    
+    // Retention issues
+    if (metrics.traffic.userRetention.day7 === 0) {
+      problems.push(`0% day-7 retention (${metrics.traffic.userRetention.day1.toFixed(2)}% day-1 drops to 0% by day-7)`);
+    }
+    
+    // Low visibility issues
+    if (metrics.search.totalImpressions < 1000) {
+      problems.push(`Very low search visibility with only ${metrics.search.totalImpressions} total impressions`);
+    }
+
+    return problems;
   }
 
   /**

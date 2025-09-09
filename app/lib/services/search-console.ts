@@ -1,6 +1,6 @@
 import { google, searchconsole_v1, Auth } from 'googleapis';
 import { GoogleAuth } from 'google-auth-library';
-import { SearchConsoleConfig } from '../types';
+import { SearchConsoleConfig, SearchQuery, PagePerformance } from '../types';
 import { format } from 'date-fns';
 
 export class SearchConsoleService {
@@ -68,6 +68,177 @@ export class SearchConsoleService {
         `Failed to fetch impressions from Search Console: ${message}. ` +
         'Please verify your service account credentials and API access.'
       );
+    }
+  }
+
+  // New detailed methods for detailed report
+  async getAveragePosition(startDate: Date, endDate: Date): Promise<{desktop: number, mobile: number}> {
+    try {
+      const [desktopResponse, mobileResponse] = await Promise.all([
+        this.client.searchanalytics.query({
+          siteUrl: this.siteUrl,
+          requestBody: {
+            startDate: format(startDate, 'yyyy-MM-dd'),
+            endDate: format(endDate, 'yyyy-MM-dd'),
+            dimensions: ['device'],
+            dimensionFilterGroups: [{
+              filters: [{
+                dimension: 'device',
+                expression: 'desktop'
+              }]
+            }],
+            rowLimit: 1,
+          },
+        }),
+        this.client.searchanalytics.query({
+          siteUrl: this.siteUrl,
+          requestBody: {
+            startDate: format(startDate, 'yyyy-MM-dd'),
+            endDate: format(endDate, 'yyyy-MM-dd'),
+            dimensions: ['device'],
+            dimensionFilterGroups: [{
+              filters: [{
+                dimension: 'device',
+                expression: 'mobile'
+              }]
+            }],
+            rowLimit: 1,
+          },
+        })
+      ]);
+
+      const desktopPosition = desktopResponse.data.rows?.[0]?.position || 0;
+      const mobilePosition = mobileResponse.data.rows?.[0]?.position || 0;
+
+      return {
+        desktop: Math.round(desktopPosition * 100) / 100,
+        mobile: Math.round(mobilePosition * 100) / 100
+      };
+    } catch (error) {
+      console.error('Error fetching average position:', error);
+      return { desktop: 0, mobile: 0 };
+    }
+  }
+
+  async getClickThroughRate(startDate: Date, endDate: Date): Promise<number> {
+    try {
+      const response = await this.client.searchanalytics.query({
+        siteUrl: this.siteUrl,
+        requestBody: {
+          startDate: format(startDate, 'yyyy-MM-dd'),
+          endDate: format(endDate, 'yyyy-MM-dd'),
+          dimensions: [],
+          rowLimit: 1,
+        },
+      });
+
+      const clicks = response.data.rows?.[0]?.clicks || 0;
+      const impressions = response.data.rows?.[0]?.impressions || 0;
+      
+      if (impressions === 0) return 0;
+      return Math.round((clicks / impressions) * 10000) / 100; // Return as percentage with 2 decimal places
+    } catch (error) {
+      console.error('Error fetching click-through rate:', error);
+      return 0;
+    }
+  }
+
+  async getTopQueries(startDate: Date, endDate: Date, limit: number = 10): Promise<SearchQuery[]> {
+    try {
+      const response = await this.client.searchanalytics.query({
+        siteUrl: this.siteUrl,
+        requestBody: {
+          startDate: format(startDate, 'yyyy-MM-dd'),
+          endDate: format(endDate, 'yyyy-MM-dd'),
+          dimensions: ['query'],
+          rowLimit: limit,
+        },
+      });
+
+      if (!response.data.rows?.length) {
+        return [];
+      }
+
+      return response.data.rows.map(row => {
+        const query = row.keys?.[0] || 'Unknown';
+        const clicks = row.clicks || 0;
+        const impressions = row.impressions || 0;
+        const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+        const position = row.position || 0;
+
+        return {
+          query,
+          clicks: Math.round(clicks),
+          impressions: Math.round(impressions),
+          ctr: Math.round(ctr * 100) / 100,
+          position: Math.round(position * 100) / 100
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching top queries:', error);
+      return [];
+    }
+  }
+
+  async getTopSearchPages(startDate: Date, endDate: Date, limit: number = 10): Promise<PagePerformance[]> {
+    try {
+      const response = await this.client.searchanalytics.query({
+        siteUrl: this.siteUrl,
+        requestBody: {
+          startDate: format(startDate, 'yyyy-MM-dd'),
+          endDate: format(endDate, 'yyyy-MM-dd'),
+          dimensions: ['page'],
+          rowLimit: limit,
+        },
+      });
+
+      if (!response.data.rows?.length) {
+        return [];
+      }
+
+      return response.data.rows.map(row => {
+        const url = row.keys?.[0] || 'Unknown';
+        const clicks = row.clicks || 0;
+        const impressions = row.impressions || 0;
+        const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
+        const position = row.position || 0;
+
+        return {
+          page: this.extractPageTitle(url),
+          url,
+          views: 0, // This will be filled from Analytics data
+          impressions: Math.round(impressions),
+          clicks: Math.round(clicks),
+          ctr: Math.round(ctr * 100) / 100,
+          position: Math.round(position * 100) / 100
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching top search pages:', error);
+      return [];
+    }
+  }
+
+  private extractPageTitle(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      const path = urlObj.pathname;
+      
+      // Extract meaningful page name from path
+      if (path === '/' || path === '') return 'Main Page';
+      
+      const segments = path.split('/').filter(s => s.length > 0);
+      const lastSegment = segments[segments.length - 1];
+      
+      // Convert URL segments to readable titles
+      return lastSegment
+        .replace(/-/g, ' ')
+        .replace(/_/g, ' ')
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    } catch {
+      return url;
     }
   }
 

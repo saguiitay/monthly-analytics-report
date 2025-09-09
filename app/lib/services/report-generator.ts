@@ -1,6 +1,7 @@
 import { AnalyticsService } from './analytics';
 import { SearchConsoleService } from './search-console';
-import { ProjectConfig, ProjectReport } from '../types';
+import { ReportFormatter } from './report-formatter';
+import { ProjectConfig, ProjectReport, DetailedProjectReport, ReportType, DetailedAnalyticsMetrics } from '../types';
 import { format } from 'date-fns';
 
 export class ReportGenerator {
@@ -110,7 +111,101 @@ export class ReportGenerator {
     };
   }
 
+  async generateDetailedReport(project: ProjectConfig, endDate?: Date): Promise<DetailedProjectReport> {
+    // Create instances for this project
+    const searchConsole = await SearchConsoleService.initialize(
+      {
+        clientEmail: process.env.GOOGLE_CLIENT_EMAIL || '',
+        privateKey: process.env.GOOGLE_PRIVATE_KEY || '',
+      },
+      project.gscSiteUrl
+    );
+
+    const analytics = new AnalyticsService({
+      clientEmail: process.env.GOOGLE_CLIENT_EMAIL || '',
+      privateKey: process.env.GOOGLE_PRIVATE_KEY || '',
+      propertyId: project.gaPropertyId
+    });
+
+    const periods = AnalyticsService.getLast30DaysPeriod(endDate);
+
+    try {
+      // Fetch all detailed metrics in parallel
+      const [
+        activeUsers,
+        userRetention,
+        trafficSources,
+        geographicDistribution,
+        topViewedPages,
+        userEngagement,
+        averagePosition,
+        clickThroughRate,
+        totalImpressions,
+        topQueries,
+        topSearchPages,
+        topEvents
+      ] = await Promise.all([
+        analytics.getActiveUsers(periods.current.startDate, periods.current.endDate, project.gaPropertyId),
+        analytics.getUserRetention(periods.current.startDate, periods.current.endDate, project.gaPropertyId),
+        analytics.getTrafficSources(periods.current.startDate, periods.current.endDate, project.gaPropertyId),
+        analytics.getGeographicDistribution(periods.current.startDate, periods.current.endDate, project.gaPropertyId),
+        analytics.getTopViewedPages(periods.current.startDate, periods.current.endDate, project.gaPropertyId),
+        analytics.getUserEngagementData(periods.current.startDate, periods.current.endDate, project.gaPropertyId),
+        searchConsole.getAveragePosition(periods.current.startDate, periods.current.endDate),
+        searchConsole.getClickThroughRate(periods.current.startDate, periods.current.endDate),
+        searchConsole.getTotalImpressions(periods.current.startDate, periods.current.endDate),
+        searchConsole.getTopQueries(periods.current.startDate, periods.current.endDate, 15),
+        searchConsole.getTopSearchPages(periods.current.startDate, periods.current.endDate, 10),
+        analytics.getTopEvents(periods.current.startDate, periods.current.endDate, project.gaPropertyId)
+      ]);
+
+      const detailedMetrics: DetailedAnalyticsMetrics = {
+        traffic: {
+          activeUsers,
+          userRetention,
+          trafficSources,
+          geographicDistribution
+        },
+        search: {
+          averagePosition,
+          clickThroughRate,
+          totalImpressions: totalImpressions.impressions,
+          totalClicks: totalImpressions.clicks,
+          topQueries
+        },
+        pagePerformance: {
+          topViewedPages,
+          topSearchPages
+        },
+        userEngagement,
+        events: topEvents,
+        strategicProblems: []
+      };
+
+      // Identify strategic problems
+      detailedMetrics.strategicProblems = ReportFormatter.identifyStrategicProblems(detailedMetrics);
+
+      return {
+        project,
+        metrics: detailedMetrics,
+        period: {
+          startDate: format(periods.current.startDate, 'yyyy-MM-dd'),
+          endDate: format(periods.current.endDate, 'yyyy-MM-dd'),
+        },
+      };
+    } catch (error) {
+      console.error('Error generating detailed report:', error);
+      throw new Error(
+        `Failed to generate detailed report for ${project.name}. Please check API access and credentials.`
+      );
+    }
+  }
+
   async generateReports(projects: ProjectConfig[], endDate?: Date): Promise<ProjectReport[]> {
     return Promise.all(projects.map(project => this.generateReport(project, endDate)));
+  }
+
+  async generateDetailedReports(projects: ProjectConfig[], endDate?: Date): Promise<DetailedProjectReport[]> {
+    return Promise.all(projects.map(project => this.generateDetailedReport(project, endDate)));
   }
 }

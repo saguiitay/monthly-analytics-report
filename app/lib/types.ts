@@ -30,6 +30,97 @@ export interface ProjectReport {
   };
 }
 
+// Detailed report types
+export interface TrafficSource {
+  source: string;
+  users: number;
+  percentage: number;
+}
+
+export interface GeographicData {
+  country: string;
+  users: number;
+  percentage: number;
+}
+
+export interface SearchQuery {
+  query: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+export interface PagePerformance {
+  page: string;
+  url?: string;
+  views: number;
+  impressions?: number;
+  clicks?: number;
+  ctr?: number;
+  position?: number;
+}
+
+export interface EventData {
+  eventName: string;
+  eventCount: number;
+  percentage: number;
+}
+
+export interface UserEngagementData {
+  peakEngagementDays: string[];
+  averageEngagementTime: number;
+  sessionQuality: {
+    min: number;
+    max: number;
+    average: number;
+  };
+}
+
+export interface DetailedTrafficMetrics {
+  activeUsers: number;
+  userRetention: {
+    day1: number;
+    day7: number;
+  };
+  trafficSources: TrafficSource[];
+  geographicDistribution: GeographicData[];
+}
+
+export interface DetailedSearchMetrics {
+  averagePosition: {
+    desktop: number;
+    mobile: number;
+  };
+  clickThroughRate: number;
+  totalImpressions: number;
+  totalClicks: number;
+  topQueries: SearchQuery[];
+}
+
+export interface DetailedAnalyticsMetrics {
+  traffic: DetailedTrafficMetrics;
+  search: DetailedSearchMetrics;
+  pagePerformance: {
+    topViewedPages: PagePerformance[];
+    topSearchPages: PagePerformance[];
+  };
+  userEngagement: UserEngagementData;
+  events: EventData[];
+  strategicProblems: string[];
+}
+
+export interface DetailedProjectReport {
+  project: ProjectConfig;
+  metrics: DetailedAnalyticsMetrics;
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+}
+
+export type ReportType = 'summary' | 'detailed';
+
 export interface SearchConsoleConfig {
   clientEmail: string;
   privateKey: string;

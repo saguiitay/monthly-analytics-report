@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ReportGenerator } from '../../lib/services/report-generator';
 import { ReportFormatter } from '../../lib/services/report-formatter';
-import { ProjectConfig, ProjectReport } from '../../lib/types';
+import { ProjectConfig, ProjectReport, DetailedProjectReport, ReportType } from '../../lib/types';
 
 export async function POST(request: NextRequest) {
   try {
-    const { projects, endDate } = await request.json();
+    const { projects, endDate, reportType = 'summary' } = await request.json();
 
     if (!Array.isArray(projects)) {
       return NextResponse.json(
         { error: 'Projects must be an array' },
+        { status: 400 }
+      );
+    }
+
+    if (reportType && !['summary', 'detailed'].includes(reportType)) {
+      return NextResponse.json(
+        { error: 'Report type must be either "summary" or "detailed"' },
         { status: 400 }
       );
     }
@@ -38,21 +45,31 @@ export async function POST(request: NextRequest) {
 
     // Initialize the report generator
     const generator = new ReportGenerator();
-
-    // Generate reports for all projects
     const endDateObj = endDate ? new Date(endDate) : undefined;
-    const reports = await generator.generateReports(projects as ProjectConfig[], endDateObj);
 
-    // Format the reports
-    const markdown = ReportFormatter.formatReport(reports);
-    const summary = reportSummary(reports);
-    //const rawHtml = ReportFormatter.markdownToRawHtml(markdown);
+    let markdown: string;
+    let summary: string;
+
+    if (reportType === 'detailed') {
+      // Generate detailed reports
+      const detailedReports = await generator.generateDetailedReports(projects as ProjectConfig[], endDateObj);
+      
+      // Format the detailed reports
+      markdown = ReportFormatter.formatDetailedReport(detailedReports);
+      summary = detailedReportSummary(detailedReports);
+    } else {
+      // Generate summary reports (existing functionality)
+      const reports = await generator.generateReports(projects as ProjectConfig[], endDateObj);
+      
+      // Format the reports
+      markdown = ReportFormatter.formatReport(reports);
+      summary = reportSummary(reports);
+    }
 
     return NextResponse.json({
       markdown,
-      summary
-      //rawHtml,
-      //html,
+      summary,
+      reportType
     });
   } catch (error) {
     console.error('Error generating report:', error);
@@ -78,6 +95,43 @@ function reportSummary(reports: ProjectReport[]): string {
 Total PageViews: ${totalPageViews}, Previous Total PageViews: ${previousTotalPageViews}
 Total Impressions: ${totalImpressions}, Previous Total Impressions: ${previousTotalImpressions}
 Total Clicks: ${totalClicks}, Previous Total Clicks: ${previousTotalClicks}
+`;
+}
+
+function detailedReportSummary(reports: DetailedProjectReport[]): string {
+  const totalActiveUsers = reports.reduce((sum, r) => sum + r.metrics.traffic.activeUsers, 0);
+  const totalImpressions = reports.reduce((sum, r) => sum + r.metrics.search.totalImpressions, 0);
+  const totalClicks = reports.reduce((sum, r) => sum + r.metrics.search.totalClicks, 0);
+  const avgCTR = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+  
+  const avgDesktopPosition = reports.reduce((sum, r) => sum + r.metrics.search.averagePosition.desktop, 0) / reports.length;
+  const avgMobilePosition = reports.reduce((sum, r) => sum + r.metrics.search.averagePosition.mobile, 0) / reports.length;
+  
+  const totalProblems = reports.reduce((sum, r) => sum + r.metrics.strategicProblems.length, 0);
+  
+  const retentionIssues = reports.filter(r => r.metrics.traffic.userRetention.day7 === 0).length;
+  
+  return `
+DETAILED REPORT SUMMARY:
+========================
+Total Active Users: ${totalActiveUsers.toLocaleString()}
+Total Search Impressions: ${totalImpressions.toLocaleString()}
+Total Clicks: ${totalClicks.toLocaleString()}
+Average Click-Through Rate: ${avgCTR.toFixed(2)}%
+Average Search Position: ${avgDesktopPosition.toFixed(1)} (Desktop), ${avgMobilePosition.toFixed(1)} (Mobile)
+
+Critical Issues:
+- ${retentionIssues} project(s) with 0% day-7 user retention
+- ${reports.filter(r => r.metrics.search.averagePosition.desktop > 80).length} project(s) with search positions > 80
+- ${reports.filter(r => r.metrics.search.clickThroughRate < 2).length} project(s) with CTR below 2%
+- ${totalProblems} total strategic problems identified across all projects
+
+Top Performing Projects (by active users):
+${reports
+  .sort((a, b) => b.metrics.traffic.activeUsers - a.metrics.traffic.activeUsers)
+  .slice(0, 3)
+  .map((r, i) => `${i + 1}. ${r.project.name}: ${r.metrics.traffic.activeUsers.toLocaleString()} users`)
+  .join('\n')}
 `;
 }
 
