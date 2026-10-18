@@ -72,6 +72,15 @@ h1 em { font-family: Georgia, "Times New Roman", serif; font-weight: normal; col
 .section-header h2 { font-size: 18px; font-weight: 600; letter-spacing: -.35px; margin-top: 7px; display: flex; align-items: center; gap: 8px; }
 .count-badge { font: 10px var(--font-mono); padding: 3px 5px; border-radius: 4px; background: var(--mist); color: var(--muted); }
 .section-copy { color: var(--muted); font-size: 11px; line-height: 1.8; margin-top: 12px; }
+.property-discovery { margin-top: 16px; }
+.property-discovery > .hint, .discovered-properties > .hint { margin-top: 8px; line-height: 1.7; }
+.discovered-properties { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }
+.property-options { list-style: none; padding: 0; max-height: 280px; overflow-y: auto; }
+.property-options li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.property-options li > div { min-width: 0; overflow-wrap: anywhere; }
+.property-options strong { display: block; font-size: 12px; }
+.property-options li > div > span { display: block; color: var(--muted); font-size: 10px; margin-top: 4px; }
+.property-options button, .property-options li > .hint { flex-shrink: 0; }
 .project-empty { padding: 27px 8px 14px; text-align: center; }
 .project-empty p { font-size: 13px; font-weight: 600; }
 .project-empty > span:last-of-type { display: block; font-size: 11px; color: var(--muted); margin-top: 6px; }

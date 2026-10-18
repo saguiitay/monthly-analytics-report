@@ -10,6 +10,22 @@ export interface ServiceAccountCredentials {
   private_key: string;
 }
 
+export interface DiscoveredProperty {
+  propertyId: string;
+  name: string;
+  accountName: string;
+}
+
+export interface PropertyDiscoveryRequest {
+  credentials: ServiceAccountCredentials;
+  pageToken?: string;
+}
+
+export interface PropertyDiscoveryResponse {
+  properties: DiscoveredProperty[];
+  nextPageToken: string | null;
+}
+
 export interface DashboardRequest {
   projects: WorkspaceProject[];
   credentials: ServiceAccountCredentials;

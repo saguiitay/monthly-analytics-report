@@ -5,6 +5,7 @@ import type { DashboardRequest, DashboardResponse, ServiceAccountCredentials, Wo
 import { createDemo } from './lib/demo';
 import { exportData, number, projectSettings, readWorkspace, reportMarkdown, saveWorkspace, validateProject } from './lib/workspace';
 import ProjectReport from './components/ProjectReport';
+import PropertyDiscovery from './components/PropertyDiscovery';
 
 const blankProject = (): WorkspaceProject => ({ id: '', name: '', url: '', propertyId: '' });
 const blankCredentials = (): ServiceAccountCredentials => ({ client_email: '', private_key: '' });
@@ -266,6 +267,7 @@ export default function Home() {
             <section className="panel projects-panel" id="projects" aria-labelledby="projects-heading">
               <div className="section-header"><div><p className="eyebrow">THE THINGS YOU’RE BUILDING</p><h2 id="projects-heading">Your projects <span className="count-badge">{projects.length}</span></h2></div><button type="button" className="button small secondary" disabled={!ready || projects.length >= 12 || !!editor} onClick={() => openEditor(blankProject())}>+ Add project</button></div>
               <p className="section-copy">Saved only in this browser. Add the GA4 properties you want to compare.</p>
+              <PropertyDiscovery credentials={credentials} projects={projects} canDiscover={validCredentials(credentials)} disabled={!ready || !!editor || projects.length >= 12} onChoose={property => openEditor({ id: '', name: property.name, propertyId: property.propertyId, url: '' })} />
               {!ready ? <p className="empty-inline">Opening your workspace…</p> : projects.length === 0 && !editor ? <div className="project-empty"><p>A home for your side projects.</p><span>Add your first project, or explore the demo.</span><button className="text-button" type="button" onClick={() => openEditor(blankProject())}>Add your first project →</button></div> : null}
               {projects.length > 0 && <ul className="saved-projects">{projects.map((project, index) => <li key={project.id}>
                 <span className={`project-avatar small-avatar tone-${index % 2}`} aria-hidden="true">{project.name.slice(0, 1).toUpperCase()}</span><div className="saved-project-info"><strong>{project.name}</strong><span>{project.url}</span><span className="property-label">GA4 · {project.propertyId}</span></div><div className="project-actions"><button className="text-button" type="button" disabled={!!editor} aria-label={`Edit ${project.name}`} onClick={() => openEditor({ ...project })}>Edit</button><button className="remove-button" type="button" disabled={!!editor} aria-label={`Remove ${project.name}`} onClick={() => { if (window.confirm(`Remove ${project.name} from this browser workspace?`)) persist(projects.filter(item => item.id !== project.id)); }}>×</button></div>
@@ -291,7 +293,7 @@ export default function Home() {
               {keyError && <p className="inline-error" role="alert">{keyError}</p>}
               {keyNotice && <p className="key-notice" role="status">{keyNotice}</p>}
               {(hasKey || jsonKey) && <button className="text-button forget-button" type="button" onClick={forgetCredentials}>Clear & forget credentials</button>}
-              <details className="setup-help"><summary>How to connect your account</summary><ol><li>In Google Cloud, enable the <strong>Google Analytics Data API</strong>.</li><li>Create a service account and download a JSON key. Keep it private.</li><li>In each GA4 property, open Admin → Property access management. Add the service-account email with the <strong>Viewer</strong> role.</li><li>Load the JSON key here, add the numeric property IDs, and generate a report.</li></ol><p>A Measurement Protocol API secret cannot read reports and is not supported.</p></details>
+              <details className="setup-help"><summary>How to connect your account</summary><ol><li>In Google Cloud, enable the <strong>Google Analytics Data API</strong> for reports and the <strong>Google Analytics Admin API</strong> for property discovery.</li><li>Create a service account and download a JSON key. Keep it private.</li><li>In each GA4 property, open Admin → Property access management. Add the service-account email with the <strong>Viewer</strong> role.</li><li>Load the JSON key here, choose <strong>Find GA4 properties</strong> or add a numeric property ID manually, and generate a report.</li></ol><p>A Measurement Protocol API secret cannot read reports and is not supported.</p></details>
             </section>
           </div>
 

@@ -5,6 +5,7 @@ A bring-your-own-credentials analytics workspace for people managing multiple we
 ## What you get
 
 - Add, edit, and remove projects with a website URL and GA4 property ID.
+- Discover accessible GA4 properties using your loaded key, then prefill a project without looking up its ID.
 - Compare 7, 30, or 90 days with the immediately preceding, equal-length period.
 - View page views, active users, sessions, and engagement rate for each project.
 - Explore daily traffic and acquisition-channel charts, plus top pages.
@@ -37,11 +38,11 @@ npm start
 
 **GA4 reporting does not use a Measurement Protocol API secret.** That secret sends events; it cannot read reports. Monthly needs a Google service-account JSON key and a numeric GA4 **property ID**, not a `G-...` measurement ID.
 
-1. In [Google Cloud Console](https://console.cloud.google.com/), create or select a project and enable the **Google Analytics Data API**.
+1. In [Google Cloud Console](https://console.cloud.google.com/), create or select a project and enable the **Google Analytics Data API**. Also enable the **Google Analytics Admin API** to discover properties automatically.
 2. Create a service account under **IAM & Admin > Service Accounts**, then create a JSON key.
 3. In GA4, open **Admin > Property access management** and add the service-account email as a **Viewer** for each property you want to report on.
-4. Find the numeric property ID in GA4's property settings.
-5. In Monthly, add your projects and import/paste the service-account JSON, or enter its email and private key.
+4. In Monthly, import/paste the service-account JSON, or enter its email and private key.
+5. Choose **Find GA4 properties**, select **Use property**, enter the website URL, and save. The name and property ID are prefilled. Alternatively, add projects manually using the numeric property ID from GA4's property settings.
 6. Choose a period and generate your report.
 
 Keys are hidden by default. Use **Show private key** / **Hide private key** to inspect the JSON or manual private-key field while editing. Switching entry methods, loading a new key, or clearing credentials hides the key again. Visibility is never saved.
@@ -52,13 +53,21 @@ Use a dedicated, least-privilege service account. Never commit a key or paste it
 
 - Project names, URLs, and property IDs are saved in this browser's local storage. They are not synchronized between devices.
 - Service-account credentials are kept in page memory only. Reloading or clearing the connection removes them. Reports and exports do not include credentials.
-- Generating a report transmits credentials to **the server hosting this application**, which uses them to authenticate with Google. Only use a deployment you operate or trust, and use HTTPS outside localhost.
+- Generating a report or finding properties transmits credentials to **the server hosting this application**, which uses them to authenticate with Google. Only use a deployment you operate or trust, and use HTTPS outside localhost.
 - The dashboard does not fall back to the host's environment credentials. Requests have isolated Google clients, and credential-bearing requests and report responses are not cached.
 - Google sees the property IDs, reporting queries, and service-account authentication required for its APIs.
 - Reports remain in page memory unless you copy or download them. A report can contain sensitive business data; share exports deliberately.
 - There is no account system, tenant database, billing, or server-side workspace persistence. This release is a self-hosted tool, **not a hardened public multi-tenant SaaS**. Restrict deployment access with your hosting provider or an authenticated reverse proxy. Add authentication, abuse controls/rate limiting, and an operational privacy policy before offering it publicly.
 
-Deploy as a Node.js Next.js application, not a static export. Run `npm run build` and `npm start`, or use a Next.js-compatible hosting service. Do not configure request-body logging or caching for `/api/dashboard`.
+Deploy as a Node.js Next.js application, not a static export. Run `npm run build` and `npm start`, or use a Next.js-compatible hosting service. Do not configure request-body logging or caching for `/api/dashboard` or `/api/properties`.
+
+## Property discovery
+
+Discovery uses the read-only [Analytics Admin API `accountSummaries.list`](https://developers.google.com/analytics/devguides/config/admin/v1/rest/v1beta/accountSummaries/list). It lists GA4 properties visible to the supplied service account, not Google Cloud projects. The private key alone is insufficient: the matching service-account email is also required.
+
+Results stay in memory and are cleared when credentials change. **Load more properties** retrieves the next page of accounts without dropping earlier selections or creating duplicate projects. Selecting a property opens an editable project form; nothing is saved until you enter a site URL and choose **Save project**. The API does not provide a website URL in its property summaries, so Monthly does not guess one. Already-added properties are marked **Added**.
+
+`POST /api/properties` accepts `{ "credentials": { "client_email": "...", "private_key": "..." }, "pageToken": "optional opaque token" }` and returns `{ "properties": [{ "propertyId": "12345", "name": "My website", "accountName": "My account" }], "nextPageToken": null }`. Supply a returned token to fetch the next page. It uses the same bounded JSON input, credential validation, same-origin checks, and no-store response policy as reporting. Invalid requests return a client error; Google failures return an actionable, credential-safe error and a non-success status. A disabled Admin API does not prevent manually configured Data API reporting.
 
 ## How to read the numbers
 

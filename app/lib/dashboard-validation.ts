@@ -1,5 +1,5 @@
 import { createPrivateKey } from 'node:crypto';
-import type { DashboardRequest, DashboardResponse, WorkspaceProject } from './dashboard-types';
+import type { DashboardRequest, DashboardResponse, WorkspaceProject, ServiceAccountCredentials, PropertyDiscoveryRequest } from './dashboard-types';
 
 export const MAX_DASHBOARD_BODY_BYTES = 256 * 1024;
 
@@ -74,7 +74,11 @@ export function validateDashboardRequest(input: unknown, now = new Date()): Dash
       endDate > now.toISOString().slice(0, 10)) {
     throw new DashboardInputError('End date must be a valid, nonfuture YYYY-MM-DD date from 2005 onward.');
   }
-  const credentials = object(data.credentials, ['client_email', 'private_key'], 'Credentials');
+  return { projects, credentials: validateServiceAccountCredentials(data.credentials), endDate, days: data.days };
+}
+
+export function validateServiceAccountCredentials(input: unknown): ServiceAccountCredentials {
+  const credentials = object(input, ['client_email', 'private_key'], 'Credentials');
   const client_email = text(credentials.client_email, 254, 'Service account email');
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._+-]*@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/.test(client_email) ||
       client_email.includes('..') || client_email.includes('.@')) {
@@ -95,7 +99,16 @@ export function validateDashboardRequest(input: unknown, now = new Date()): Dash
   } catch {
     throw new DashboardInputError('The private_key is not a valid RSA service account key (2048 bits or stronger).');
   }
-  return { projects, credentials: { client_email, private_key }, endDate, days: data.days };
+  return { client_email, private_key };
+}
+
+export function validatePropertyDiscoveryRequest(input: unknown): PropertyDiscoveryRequest {
+  const data = object(input, ['credentials', 'pageToken'], 'Request');
+  const credentials = validateServiceAccountCredentials(data.credentials);
+  return {
+    credentials,
+    ...(data.pageToken === undefined ? {} : { pageToken: text(data.pageToken, 4096, 'Page token') }),
+  };
 }
 
 export function enforceDashboardOrigin(request: Request): void {
