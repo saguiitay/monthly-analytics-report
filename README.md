@@ -82,6 +82,7 @@ For multiple properties, check individual rows or use **Select all** (or **Selec
 
 ## How to read the numbers
 
+- Traffic summaries use green for growth, red for declines, and neutral styling for unchanged traffic or a zero comparison baseline.
 - Date ranges are inclusive: a 30-day report has exactly 30 calendar dates. The comparison period ends the day before the current period begins.
 - Dates are interpreted in each GA4 property's reporting timezone. Today's data can be incomplete; Google processing delays also affect recent dates.
 - Active users are fetched as a distinct count over the full period, not calculated by adding daily users. Users summed across different properties are **not deduplicated**.

@@ -10,6 +10,8 @@ function shortDate(date: string) {
 export default function ProjectReport({ report, index }: { report: DashboardProjectReport; index: number }) {
   const chartId = useId();
   const { daily, channels } = report;
+  const pageViewChange = report.metrics.pageViews.percentageChange;
+  const trafficTrend = pageViewChange === null || pageViewChange === 0 ? 'neutral' : pageViewChange > 0 ? 'positive' : 'negative';
   const maximum = Math.max(1, ...daily.map(day => day.pageViews));
   const points = daily.map((day, i) => `${16 + (i / Math.max(1, daily.length - 1)) * 568},${160 - day.pageViews / maximum * 130}`);
   const line = points.length === 1 ? `16,${160 - daily[0].pageViews / maximum * 130} 584,${160 - daily[0].pageViews / maximum * 130}` : points.join(' ');
@@ -67,7 +69,7 @@ export default function ProjectReport({ report, index }: { report: DashboardProj
           </li>)}</ul> : <p className="chart-empty">No channel sessions recorded.</p>}
         </section>
       </div>
-      <div className="takeaway"><span aria-hidden="true">↳</span><p>{takeaway(report)}</p></div>
+      <div className={`takeaway ${trafficTrend}`}><span aria-hidden="true">↳</span><p>{takeaway(report)}</p></div>
       <details className="top-pages">
         <summary><Icon name="chevron" />Top pages <span className="hint">by pageviews</span></summary>
         {report.topPages.length ? <div className="table-scroll"><table><caption className="sr-only">Top pages for {report.project.name}</caption>

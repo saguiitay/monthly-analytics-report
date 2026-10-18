@@ -243,8 +243,10 @@ th:last-child, td:last-child { text-align: right; font-family: var(--font-mono);
 tbody tr:hover { background: #f8faff; }
 .data-disclosure table { margin-top: 10px; font-size: 11px; }
 .data-disclosure td:not(:first-child) { text-align: right; font-family: var(--font-mono); }
-.takeaway { display: flex; align-items: flex-start; gap: 10px; padding: 12px 18px; background: #f4faf8; border-bottom: 1px solid var(--border); color: #32645f; font-size: 11px; line-height: 1.7; }
-.takeaway > span { font-size: 19px; line-height: 1.2; color: var(--teal); }
+.takeaway { display: flex; align-items: flex-start; gap: 10px; padding: 12px 18px; background: var(--mist); border-bottom: 1px solid var(--border); color: var(--muted); font-size: 11px; line-height: 1.7; }
+.takeaway.positive { background: #f4faf8; color: #32645f; }
+.takeaway.negative { background: #fcf0ee; color: var(--danger); }
+.takeaway > span { font-size: 19px; line-height: 1.2; color: inherit; }
 .top-pages { padding: 0 18px; }
 .top-pages summary { min-height: 46px; font-size: 12px; font-weight: 600; }
 .top-pages .hint { margin-left: auto; font-size: 11px; }
