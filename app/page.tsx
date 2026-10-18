@@ -6,17 +6,13 @@ import { createDemo } from './lib/demo';
 import { exportData, number, projectSettings, readWorkspace, reportMarkdown, saveWorkspace, validateProject } from './lib/workspace';
 import ProjectReport from './components/ProjectReport';
 import PropertyDiscovery from './components/PropertyDiscovery';
+import { CREDENTIAL_SESSION_KEY, readSessionCredentials, saveSessionCredentials, validCredentials } from './lib/credential-session';
 
 const blankProject = (): WorkspaceProject => ({ id: '', name: '', url: '', propertyId: '' });
 const blankCredentials = (): ServiceAccountCredentials => ({ client_email: '', private_key: '' });
 const today = () => new Date().toISOString().slice(0, 10);
 const yesterday = () => new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 
-function validCredentials(credentials: ServiceAccountCredentials) {
-  return /^[^\s@]+@[^\s@]+\.gserviceaccount\.com$/.test(credentials.client_email.trim()) &&
-    credentials.private_key.trim().startsWith('-----BEGIN PRIVATE KEY-----') &&
-    credentials.private_key.trim().endsWith('-----END PRIVATE KEY-----');
-}
 export default function Home() {
   const [projects, setProjects] = useState<WorkspaceProject[]>([]);
   const [ready, setReady] = useState(false);
@@ -24,6 +20,8 @@ export default function Home() {
   const [editor, setEditor] = useState<WorkspaceProject | null>(null);
   const [projectError, setProjectError] = useState('');
   const [credentials, setCredentials] = useState<ServiceAccountCredentials>(blankCredentials);
+  const [credentialStorageReady, setCredentialStorageReady] = useState(false);
+  const [credentialStorageError, setCredentialStorageError] = useState('');
   const [jsonKey, setJsonKey] = useState('');
   const [keyError, setKeyError] = useState('');
   const [keyNotice, setKeyNotice] = useState('');
@@ -49,9 +47,31 @@ export default function Home() {
   useEffect(() => {
     try { setProjects(readWorkspace(window.localStorage)); }
     catch { setStorageError('Saved projects could not be read. Nothing was overwritten. You can use this workspace in memory, then save projects again.'); }
+    try {
+      const saved = readSessionCredentials(window.sessionStorage);
+      if (saved) {
+        setCredentials(saved);
+        setKeyNotice('Credentials restored for this tab. Access is not verified yet.');
+      }
+      setCredentialStorageReady(true);
+    } catch {
+      setCredentialStorageError('Saved credentials could not be restored. Load your key again or choose “Clear & forget credentials.”');
+    }
     setReady(true);
     return () => { controller.current?.abort(); fileReadId.current += 1; };
   }, []);
+
+  useEffect(() => {
+    if (!credentialStorageReady) return;
+    try {
+      saveSessionCredentials(window.sessionStorage, credentials);
+      setCredentialStorageError('');
+    } catch {
+      setCredentialStorageError(validCredentials(credentials)
+        ? 'Browser session storage is unavailable or full. Your key works in memory but may not survive a refresh. Allow site storage and load the key again.'
+        : 'Session storage could not be cleared. Remove this site’s stored data to erase any previously saved credentials.');
+    }
+  }, [credentials, credentialStorageReady]);
 
   const editorId = editor?.id;
   useEffect(() => { if (editorId !== undefined) editorName.current?.focus(); }, [editorId]);
@@ -76,6 +96,7 @@ export default function Home() {
   function updateCredentials(next: ServiceAccountCredentials) {
     invalidate();
     setCredentials(next);
+    setCredentialStorageReady(true);
     setVerified(false);
     setKeyError('');
     setKeyNotice('');
@@ -87,7 +108,13 @@ export default function Home() {
     updateCredentials(blankCredentials());
     setJsonKey('');
     setFileVersion(value => value + 1);
-    setKeyNotice('Credentials cleared from this workspace.');
+    try {
+      window.sessionStorage.removeItem(CREDENTIAL_SESSION_KEY);
+      setCredentialStorageError('');
+      setKeyNotice('Credentials cleared from this tab and its session storage.');
+    } catch {
+      setCredentialStorageError('Credentials were cleared from memory, but browser storage could not be cleared. Remove this site’s stored data before leaving this device.');
+    }
   }
 
   function importKey(raw: string) {
@@ -102,7 +129,7 @@ export default function Home() {
       updateCredentials(next);
       setShowPrivateKey(false);
       setJsonKey('');
-      setKeyNotice('Service-account key loaded in memory. Access is not verified yet.');
+      setKeyNotice('Service-account key loaded. Access is not verified yet.');
     } catch {
       setKeyError('Use a valid Google service-account JSON key (under 128 KB), including client_email and private_key. A Measurement Protocol API secret will not work.');
     }
@@ -256,7 +283,7 @@ export default function Home() {
         <a className="brand" href="#" aria-label="Monthly home"><span className="brand-mark" aria-hidden="true">m</span>monthly<span className="brand-period">.</span></a>
         <div className="nav-caption">YOUR WORKSPACE</div>
         <nav><a className="nav-item active" href="#overview"><span aria-hidden="true">▦</span> Overview</a><a className="nav-item" href="#projects"><span aria-hidden="true">▱</span> Projects <span className="nav-count">{projects.length}</span></a><a className="nav-item" href="#connection"><span aria-hidden="true">⌁</span> Connection</a></nav>
-        <div className="sidebar-bottom"><span className="local-dot" /> Browser-local workspace<p>Your projects stay here.<br />Your key stays in memory.</p><a href="#privacy">How privacy works <span aria-hidden="true">↗</span></a></div>
+        <div className="sidebar-bottom"><span className="local-dot" /> Browser-local workspace<p>Your projects stay here.<br />Your key survives refreshes.</p><a href="#privacy">How privacy works <span aria-hidden="true">↗</span></a></div>
       </aside>
       <div className="workspace-body">
         <header className="topbar"><div><span className="breadcrumb">Workspace</span><span aria-hidden="true"> / </span><span>Overview</span></div><span className="private-label"><span aria-hidden="true">◈</span> Your analytics. Your key.</span></header>
@@ -285,14 +312,15 @@ export default function Home() {
 
             <section className="panel connection-panel" id="connection" aria-labelledby="connection-heading">
               <div className="section-header"><div><p className="eyebrow">BRING YOUR OWN KEY</p><h2 id="connection-heading">Google Analytics</h2></div><span className={`status-pill ${verified ? 'connected' : ''}`}><span aria-hidden="true">●</span> {verified ? 'Access verified' : hasKey ? 'Key entered · unverified' : 'Not connected'}</span></div>
-              <p className="section-copy">Connect with a service-account JSON key. Your key is never saved to browser storage.</p>
+              <p className="section-copy">Connect with a service-account JSON key. Credentials stay in this tab’s session storage across refreshes. Use “Clear & forget” to remove them.</p>
               <div className="input-tabs" aria-label="Credential entry method"><button type="button" aria-pressed={credentialMode === 'json'} onClick={() => { setCredentialMode('json'); setShowPrivateKey(false); }}>JSON key</button><button type="button" aria-pressed={credentialMode === 'manual'} onClick={() => { setCredentialMode('manual'); setShowPrivateKey(false); }}>Enter manually</button></div>
               {credentialMode === 'json' ? <div className="credential-fields"><label htmlFor="json-key">Paste service-account JSON<textarea className={`secret-field${showPrivateKey ? ' is-visible' : ''}`} id="json-key" rows={3} autoComplete="off" spellCheck={false} value={jsonKey} placeholder="Paste the contents of your JSON key file" onChange={event => { fileReadId.current += 1; updateCredentials(blankCredentials()); setJsonKey(event.target.value); }} /></label><div className="key-actions"><button type="button" className="button secondary small" disabled={!jsonKey.trim()} onClick={() => { fileReadId.current += 1; importKey(jsonKey); }}>Load pasted key</button><label className="file-label" htmlFor="key-file">or upload .json<input key={fileVersion} id="key-file" type="file" accept=".json,application/json" onChange={event => { void uploadKey(event.target.files?.[0]); event.target.value = ''; }} /></label></div></div> :
                 <div className="credential-fields"><label htmlFor="client-email">Service-account email<input id="client-email" type="email" autoComplete="off" spellCheck={false} value={credentials.client_email} placeholder="name@project.iam.gserviceaccount.com" onChange={event => { fileReadId.current += 1; updateCredentials({ ...credentials, client_email: event.target.value }); setJsonKey(''); }} /></label><label htmlFor="private-key">Private key <span className="hint">{showPrivateKey ? 'visible on screen' : 'hidden as you type'}</span><textarea className={`secret-field${showPrivateKey ? ' is-visible' : ''}`} id="private-key" rows={3} autoComplete="off" spellCheck={false} value={credentials.private_key} placeholder="-----BEGIN PRIVATE KEY-----" onChange={event => { fileReadId.current += 1; updateCredentials({ ...credentials, private_key: event.target.value }); setJsonKey(''); }} /></label></div>}
               <button className="text-button" type="button" aria-pressed={showPrivateKey} aria-controls={credentialMode === 'json' ? 'json-key' : 'private-key'} onClick={() => setShowPrivateKey(visible => !visible)}>{showPrivateKey ? 'Hide private key' : 'Show private key'}</button>
               {keyError && <p className="inline-error" role="alert">{keyError}</p>}
               {keyNotice && <p className="key-notice" role="status">{keyNotice}</p>}
-              {(hasKey || jsonKey) && <button className="text-button forget-button" type="button" onClick={forgetCredentials}>Clear & forget credentials</button>}
+              {credentialStorageError && <p className="inline-error" role="alert">{credentialStorageError}</p>}
+              {(hasKey || jsonKey || credentialStorageError) && <button className="text-button forget-button" type="button" onClick={forgetCredentials}>Clear & forget credentials</button>}
               <details className="setup-help"><summary>How to connect your account</summary><ol><li>In Google Cloud, enable the <strong>Google Analytics Data API</strong> for reports and the <strong>Google Analytics Admin API</strong> for property discovery.</li><li>Create a service account and download a JSON key. Keep it private.</li><li>In each GA4 property, open Admin → Property access management. Add the service-account email with the <strong>Viewer</strong> role.</li><li>Load the JSON key here, choose <strong>Find GA4 properties</strong> or add a numeric property ID manually, and generate a report.</li></ol><p>A Measurement Protocol API secret cannot read reports and is not supported.</p></details>
             </section>
           </div>
@@ -312,7 +340,7 @@ export default function Home() {
             {report.reports.map((project, index) => <ProjectReport key={project.project.id} report={project} index={index} />)}
           </section>}
           {!report && !loading && <section className="report-placeholder"><div className="placeholder-fingerprint" aria-hidden="true"><svg viewBox="0 0 320 90"><path d="M0 66 L22 60 L40 68 L58 40 L78 49 L98 33 L118 46 L138 22 L158 35 L178 30 L198 51 L218 28 L238 34 L258 13 L278 23 L300 10 L320 17" /></svg></div><p className="eyebrow">YOUR NEXT CHECK-IN STARTS HERE</p><h2>Every project has a pattern.</h2><p>Add your projects and connect Google Analytics to find yours.<br />Or <button className="text-button" type="button" onClick={exploreDemo}>explore the demo</button> — no key needed.</p></section>}
-          <footer className="privacy-footer" id="privacy"><div className="footer-wordmark">monthly.</div><p><strong>Private by design, not by promise.</strong> Project names, URLs, and property IDs are saved in this browser’s local storage, not a cloud account. Credentials live only in this tab’s memory and are sent over your connection to this app’s report server, which uses them to query Google Analytics. They are not intentionally stored or included in exports. Closing or refreshing the tab forgets the key. Use a trusted deployment over HTTPS.</p><span>Built for the things you build.</span></footer>
+          <footer className="privacy-footer" id="privacy"><div className="footer-wordmark">monthly.</div><p><strong>Private by design, not by promise.</strong> Projects use this browser’s local storage. Credentials use this tab’s session storage so refreshing keeps your connection; the private key is hidden again after reload. Credentials are sent to this app’s server only when finding properties or generating reports, and are not intentionally stored on the server or included in exports. Session storage is readable by scripts on this site and may survive browser session restore. Use “Clear & forget credentials” on shared devices and a trusted deployment over HTTPS.</p><span>Built for the things you build.</span></footer>
         </main>
       </div>
     </div>
