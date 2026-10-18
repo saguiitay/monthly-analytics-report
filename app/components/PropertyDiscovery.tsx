@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DiscoveredProperty, PropertyDiscoveryResponse, ServiceAccountCredentials, WorkspaceProject } from '../lib/dashboard-types';
 
-export default function PropertyDiscovery({ credentials, projects, canDiscover, disabled, onChoose }: {
+export default function PropertyDiscovery({ credentials, projects, connectionError, disabled, selectionDisabled, onChoose }: {
   credentials: ServiceAccountCredentials;
   projects: WorkspaceProject[];
-  canDiscover: boolean;
+  connectionError: string | null;
   disabled: boolean;
+  selectionDisabled: boolean;
   onChoose: (property: DiscoveredProperty) => void;
 }) {
   const [result, setResult] = useState<PropertyDiscoveryResponse | null>(null);
@@ -31,7 +32,11 @@ export default function PropertyDiscovery({ credentials, projects, canDiscover, 
   }, [credentials]);
 
   async function findProperties(more = false) {
-    if (busy.current || !canDiscover || disabled) return;
+    if (busy.current || disabled) return;
+    if (connectionError) {
+      setError(connectionError);
+      return;
+    }
     busy.current = true;
     setLoading(true);
     setError('');
@@ -49,7 +54,7 @@ export default function PropertyDiscovery({ credentials, projects, canDiscover, 
         body: JSON.stringify({
           credentials: {
             client_email: credentials.client_email.trim(),
-            private_key: credentials.private_key.replace(/\\n/g, '\n').trim(),
+            private_key: credentials.private_key,
           },
           ...(more && result?.nextPageToken ? { pageToken: result.nextPageToken } : {}),
         }),
@@ -81,10 +86,12 @@ export default function PropertyDiscovery({ credentials, projects, canDiscover, 
 
   return (
     <div className="property-discovery">
-      <button type="button" className="button secondary small" disabled={!canDiscover || disabled || loading} onClick={() => void findProperties()}>
+      <button type="button" className="button secondary small" disabled={disabled || loading} onClick={() => void findProperties()}>
         {loading ? 'Finding GA4 properties…' : result ? 'Refresh GA4 properties' : 'Find GA4 properties'}
       </button>
-      <p className="hint">{canDiscover ? 'Find properties this key can access. Select one, then enter its site URL.' : 'Load a service-account key in Google Analytics to find your properties automatically.'}</p>
+      <p className="hint">{!connectionError ? 'Find properties this key can access. Select one, then enter its site URL.' : 'Paste the full service-account JSON, or enter both its email and private key, in Google Analytics.'}</p>
+      {selectionDisabled && <p className="hint">You can find properties while editing. Save or cancel your current project before selecting another property.</p>}
+      {projects.length >= 12 && <p className="hint">Your workspace has 12 projects. Remove one before adding another discovered property.</p>}
       {loading && <p className="hint" role="status">Reading accessible properties from Google Analytics…</p>}
       {error && <p className="inline-error" role="alert">{error}</p>}
       {result && <div className="discovered-properties">
@@ -95,7 +102,7 @@ export default function PropertyDiscovery({ credentials, projects, canDiscover, 
             const added = projects.some(project => project.propertyId === property.propertyId);
             return <li key={property.propertyId}>
               <div><strong>{property.name}</strong><span>{property.accountName} · {property.propertyId}</span></div>
-              {added ? <span className="hint">Added</span> : <button className="text-button" type="button" disabled={disabled || projects.length >= 12} aria-label={`Use ${property.name} (${property.propertyId})`} onClick={() => onChoose(property)}>Use property</button>}
+              {added ? <span className="hint">Added</span> : <button className="text-button" type="button" disabled={disabled || selectionDisabled || projects.length >= 12} aria-label={`Use ${property.name} (${property.propertyId})`} onClick={() => onChoose(property)}>Use property</button>}
             </li>;
           })}
         </ul>

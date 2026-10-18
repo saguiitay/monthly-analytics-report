@@ -27,6 +27,14 @@ test('validates and trims an explicit dashboard request without retaining unknow
   assert.deepEqual(Object.keys(output.credentials), ['client_email', 'private_key']);
 });
 
+test('accepts literal backslash-n and escaped CRLF private keys as well as actual PEM line breaks', () => {
+  for (const lineBreak of ['\\n', '\\r\\n', '\r\n']) {
+    const input = valid();
+    input.credentials.private_key = private_key.toString().replace(/\n/g, lineBreak);
+    assert.equal(validateDashboardRequest(input, now).credentials.private_key, private_key.toString().trim());
+  }
+});
+
 test('rejects malformed, incomplete and unsupported request shapes', () => {
   for (const input of [null, [], 1, {}, { ...valid(), credentials: null }, { ...valid(), extra: true }]) {
     assert.throws(() => validateDashboardRequest(input, now), DashboardInputError);

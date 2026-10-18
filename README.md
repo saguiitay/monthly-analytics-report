@@ -47,12 +47,16 @@ npm start
 
 Keys are hidden by default. Use **Show private key** / **Hide private key** to inspect the JSON or manual private-key field while editing. Switching entry methods, loading a new key, or clearing credentials hides the key again. Visibility is never saved.
 
+Manual private keys support actual line breaks, literal `\n` sequences, and Windows CRLF line breaks. The original text is retained for editing and normalized before authentication. Manual entry needs **both** the private key and matching service-account email. Alternatively, paste the entire service-account JSON: discovery and reports can use it immediately, without clicking **Load pasted key** first. If an entry is incomplete, **Find GA4 properties** explains what is missing instead of staying disabled.
+
+Property discovery remains available while editing a project. Save or cancel the current edit before selecting a discovered property so unfinished project details are not overwritten.
+
 Use a dedicated, least-privilege service account. Never commit a key or paste it into a report. Revoke a compromised key in Google Cloud.
 
 ## Privacy and hosting
 
 - Project names, URLs, and property IDs are saved in this browser's local storage. They are not synchronized between devices.
-- Service-account credentials are kept in this tab's **session storage** and restored when you refresh. They are not stored in persistent local storage, reports, or exports. **Clear & forget credentials** removes the saved connection and in-memory key. Only loaded/valid credentials are saved; unfinished JSON input is not.
+- Credential drafts are kept in this tab's **session storage**, including incomplete manual fields, pasted JSON, and the selected entry method. Refreshing restores what you entered; you do not need to load or validate a key first. They are not stored in persistent local storage, reports, or exports. **Clear & forget credentials** removes all saved entry fields and the in-memory key.
 - Session storage is not an encrypted vault: scripts running on this origin can read it, as they can read an in-memory key. Use a trusted deployment/device. It is normally scoped to this tab, but browser session restore or duplicated tabs may retain a copy; explicitly clear credentials before leaving a shared device. Key visibility is not saved and resets to hidden on reload.
 - Generating a report or finding properties transmits credentials to **the server hosting this application**, which uses them to authenticate with Google. Only use a deployment you operate or trust, and use HTTPS outside localhost.
 - The dashboard does not fall back to the host's environment credentials. Requests have isolated Google clients, and credential-bearing requests and report responses are not cached.

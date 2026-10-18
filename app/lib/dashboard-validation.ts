@@ -87,7 +87,7 @@ export function validateServiceAccountCredentials(input: unknown): ServiceAccoun
   if (typeof credentials.private_key !== 'string' || credentials.private_key.length > 16384) {
     throw new DashboardInputError('Enter the PEM private_key from the service account JSON key.');
   }
-  const private_key = credentials.private_key.trim().replace(/\r\n/g, '\n');
+  const private_key = credentials.private_key.replace(/\\r\\n|\\n|\r\n/g, '\n').trim();
   if (!/^-----BEGIN PRIVATE KEY-----\n[A-Za-z0-9+/=\n]+\n-----END PRIVATE KEY-----$/.test(private_key)) {
     throw new DashboardInputError('Enter a valid unencrypted PEM private_key from the service account JSON key.');
   }

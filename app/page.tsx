@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DashboardRequest, DashboardResponse, ServiceAccountCredentials, WorkspaceProject } from './lib/dashboard-types';
 import { createDemo } from './lib/demo';
 import { exportData, number, projectSettings, readWorkspace, reportMarkdown, saveWorkspace, validateProject } from './lib/workspace';
 import ProjectReport from './components/ProjectReport';
 import PropertyDiscovery from './components/PropertyDiscovery';
-import { CREDENTIAL_SESSION_KEY, readSessionCredentials, saveSessionCredentials, validCredentials } from './lib/credential-session';
+import { CREDENTIAL_SESSION_KEY, parseServiceAccountJson, readCredentialSession, resolveSessionCredentials, saveCredentialSession } from './lib/credential-session';
 
 const blankProject = (): WorkspaceProject => ({ id: '', name: '', url: '', propertyId: '' });
 const blankCredentials = (): ServiceAccountCredentials => ({ client_email: '', private_key: '' });
@@ -43,15 +43,24 @@ export default function Home() {
   const editorName = useRef<HTMLInputElement>(null);
   const resultsSection = useRef<HTMLElement>(null);
   const resultsHeading = useRef<HTMLHeadingElement>(null);
+  const connection = useMemo(() => {
+    try {
+      return { credentials: resolveSessionCredentials({ credentials, jsonKey, mode: credentialMode }), error: null };
+    } catch (error) {
+      return { credentials: blankCredentials(), error: error instanceof Error ? error.message : 'Check your service-account credentials.' };
+    }
+  }, [credentials, jsonKey, credentialMode]);
 
   useEffect(() => {
     try { setProjects(readWorkspace(window.localStorage)); }
     catch { setStorageError('Saved projects could not be read. Nothing was overwritten. You can use this workspace in memory, then save projects again.'); }
     try {
-      const saved = readSessionCredentials(window.sessionStorage);
+      const saved = readCredentialSession(window.sessionStorage);
       if (saved) {
-        setCredentials(saved);
-        setKeyNotice('Credentials restored for this tab. Access is not verified yet.');
+        setCredentials(saved.credentials);
+        setJsonKey(saved.jsonKey);
+        setCredentialMode(saved.mode);
+        setKeyNotice('Saved credential entry restored for this tab. Access is not verified yet.');
       }
       setCredentialStorageReady(true);
     } catch {
@@ -64,14 +73,14 @@ export default function Home() {
   useEffect(() => {
     if (!credentialStorageReady) return;
     try {
-      saveSessionCredentials(window.sessionStorage, credentials);
+      saveCredentialSession(window.sessionStorage, { credentials, jsonKey, mode: credentialMode });
       setCredentialStorageError('');
     } catch {
-      setCredentialStorageError(validCredentials(credentials)
-        ? 'Browser session storage is unavailable or full. Your key works in memory but may not survive a refresh. Allow site storage and load the key again.'
+      setCredentialStorageError(credentials.client_email || credentials.private_key || jsonKey
+        ? 'Browser session storage is unavailable or full. Your entry is kept in memory but may not survive a refresh. Allow site storage and enter it again.'
         : 'Session storage could not be cleared. Remove this site’s stored data to erase any previously saved credentials.');
     }
-  }, [credentials, credentialStorageReady]);
+  }, [credentials, jsonKey, credentialMode, credentialStorageReady]);
 
   const editorId = editor?.id;
   useEffect(() => { if (editorId !== undefined) editorName.current?.focus(); }, [editorId]);
@@ -119,20 +128,23 @@ export default function Home() {
 
   function importKey(raw: string) {
     try {
-      if (raw.length > 131072) throw new Error('Too large');
-      const parsed: unknown = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') throw new Error('Invalid key');
-      const key = parsed as Record<string, unknown>;
-      if (key.type !== 'service_account' || typeof key.client_email !== 'string' || typeof key.private_key !== 'string') throw new Error('Invalid key');
-      const next = { client_email: key.client_email.trim(), private_key: key.private_key.replace(/\\n/g, '\n').trim() };
-      if (!validCredentials(next)) throw new Error('Invalid key');
+      const next = parseServiceAccountJson(raw);
       updateCredentials(next);
       setShowPrivateKey(false);
-      setJsonKey('');
+      setJsonKey(raw);
       setKeyNotice('Service-account key loaded. Access is not verified yet.');
-    } catch {
-      setKeyError('Use a valid Google service-account JSON key (under 128 KB), including client_email and private_key. A Measurement Protocol API secret will not work.');
+    } catch (error) {
+      setKeyError(error instanceof Error ? error.message : 'Use a complete Google service-account JSON key.');
     }
+  }
+
+  function changeCredentialMode(mode: 'json' | 'manual') {
+    fileReadId.current += 1;
+    invalidate();
+    setCredentialMode(mode);
+    setShowPrivateKey(false);
+    setVerified(false);
+    setKeyError('');
   }
 
   async function uploadKey(file: File | undefined) {
@@ -192,7 +204,7 @@ export default function Home() {
     setFeedback('');
     if (editor) { setError('Save or cancel the project you are editing before generating a report.'); return; }
     if (!projects.length) { setError('Add at least one project to generate a report.'); return; }
-    if (!validCredentials(credentials)) { setError('Load a service-account JSON key or enter its email and private key first.'); return; }
+    if (connection.error) { setError(connection.error); return; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate) || !Number.isFinite(Date.parse(`${endDate}T12:00:00Z`)) || endDate > today()) {
       setError('Choose a valid end date that is not in the future.'); return;
     }
@@ -207,7 +219,7 @@ export default function Home() {
     const id = ++requestId.current;
     const payload: DashboardRequest = {
       projects: projects.map(projectSettings),
-      credentials: { client_email: credentials.client_email.trim(), private_key: credentials.private_key.replace(/\\n/g, '\n').trim() },
+      credentials: connection.credentials,
       days,
       endDate,
     };
@@ -274,7 +286,7 @@ export default function Home() {
 
   const totalPageViews = report?.reports.reduce((total, project) => total + project.metrics.pageViews.current, 0) ?? 0;
   const totalUsers = report?.reports.reduce((total, project) => total + project.metrics.activeUsers.current, 0) ?? 0;
-  const hasKey = !!credentials.client_email || !!credentials.private_key;
+  const hasKey = !!credentials.client_email || !!credentials.private_key || !!jsonKey;
 
   return (
     <div className="workspace-shell">
@@ -294,7 +306,7 @@ export default function Home() {
             <section className="panel projects-panel" id="projects" aria-labelledby="projects-heading">
               <div className="section-header"><div><p className="eyebrow">THE THINGS YOU’RE BUILDING</p><h2 id="projects-heading">Your projects <span className="count-badge">{projects.length}</span></h2></div><button type="button" className="button small secondary" disabled={!ready || projects.length >= 12 || !!editor} onClick={() => openEditor(blankProject())}>+ Add project</button></div>
               <p className="section-copy">Saved only in this browser. Add the GA4 properties you want to compare.</p>
-              <PropertyDiscovery credentials={credentials} projects={projects} canDiscover={validCredentials(credentials)} disabled={!ready || !!editor || projects.length >= 12} onChoose={property => openEditor({ id: '', name: property.name, propertyId: property.propertyId, url: '' })} />
+              <PropertyDiscovery credentials={connection.credentials} connectionError={connection.error} projects={projects} disabled={!ready} selectionDisabled={!!editor} onChoose={property => openEditor({ id: '', name: property.name, propertyId: property.propertyId, url: '' })} />
               {!ready ? <p className="empty-inline">Opening your workspace…</p> : projects.length === 0 && !editor ? <div className="project-empty"><p>A home for your side projects.</p><span>Add your first project, or explore the demo.</span><button className="text-button" type="button" onClick={() => openEditor(blankProject())}>Add your first project →</button></div> : null}
               {projects.length > 0 && <ul className="saved-projects">{projects.map((project, index) => <li key={project.id}>
                 <span className={`project-avatar small-avatar tone-${index % 2}`} aria-hidden="true">{project.name.slice(0, 1).toUpperCase()}</span><div className="saved-project-info"><strong>{project.name}</strong><span>{project.url}</span><span className="property-label">GA4 · {project.propertyId}</span></div><div className="project-actions"><button className="text-button" type="button" disabled={!!editor} aria-label={`Edit ${project.name}`} onClick={() => openEditor({ ...project })}>Edit</button><button className="remove-button" type="button" disabled={!!editor} aria-label={`Remove ${project.name}`} onClick={() => { if (window.confirm(`Remove ${project.name} from this browser workspace?`)) persist(projects.filter(item => item.id !== project.id)); }}>×</button></div>
@@ -311,11 +323,11 @@ export default function Home() {
             </section>
 
             <section className="panel connection-panel" id="connection" aria-labelledby="connection-heading">
-              <div className="section-header"><div><p className="eyebrow">BRING YOUR OWN KEY</p><h2 id="connection-heading">Google Analytics</h2></div><span className={`status-pill ${verified ? 'connected' : ''}`}><span aria-hidden="true">●</span> {verified ? 'Access verified' : hasKey ? 'Key entered · unverified' : 'Not connected'}</span></div>
+              <div className="section-header"><div><p className="eyebrow">BRING YOUR OWN KEY</p><h2 id="connection-heading">Google Analytics</h2></div><span className={`status-pill ${verified ? 'connected' : ''}`}><span aria-hidden="true">●</span> {verified ? 'Access verified' : hasKey ? connection.error ? 'Credentials incomplete' : 'Key entered · unverified' : 'Not connected'}</span></div>
               <p className="section-copy">Connect with a service-account JSON key. Credentials stay in this tab’s session storage across refreshes. Use “Clear & forget” to remove them.</p>
-              <div className="input-tabs" aria-label="Credential entry method"><button type="button" aria-pressed={credentialMode === 'json'} onClick={() => { setCredentialMode('json'); setShowPrivateKey(false); }}>JSON key</button><button type="button" aria-pressed={credentialMode === 'manual'} onClick={() => { setCredentialMode('manual'); setShowPrivateKey(false); }}>Enter manually</button></div>
-              {credentialMode === 'json' ? <div className="credential-fields"><label htmlFor="json-key">Paste service-account JSON<textarea className={`secret-field${showPrivateKey ? ' is-visible' : ''}`} id="json-key" rows={3} autoComplete="off" spellCheck={false} value={jsonKey} placeholder="Paste the contents of your JSON key file" onChange={event => { fileReadId.current += 1; updateCredentials(blankCredentials()); setJsonKey(event.target.value); }} /></label><div className="key-actions"><button type="button" className="button secondary small" disabled={!jsonKey.trim()} onClick={() => { fileReadId.current += 1; importKey(jsonKey); }}>Load pasted key</button><label className="file-label" htmlFor="key-file">or upload .json<input key={fileVersion} id="key-file" type="file" accept=".json,application/json" onChange={event => { void uploadKey(event.target.files?.[0]); event.target.value = ''; }} /></label></div></div> :
-                <div className="credential-fields"><label htmlFor="client-email">Service-account email<input id="client-email" type="email" autoComplete="off" spellCheck={false} value={credentials.client_email} placeholder="name@project.iam.gserviceaccount.com" onChange={event => { fileReadId.current += 1; updateCredentials({ ...credentials, client_email: event.target.value }); setJsonKey(''); }} /></label><label htmlFor="private-key">Private key <span className="hint">{showPrivateKey ? 'visible on screen' : 'hidden as you type'}</span><textarea className={`secret-field${showPrivateKey ? ' is-visible' : ''}`} id="private-key" rows={3} autoComplete="off" spellCheck={false} value={credentials.private_key} placeholder="-----BEGIN PRIVATE KEY-----" onChange={event => { fileReadId.current += 1; updateCredentials({ ...credentials, private_key: event.target.value }); setJsonKey(''); }} /></label></div>}
+              <div className="input-tabs" aria-label="Credential entry method"><button type="button" aria-pressed={credentialMode === 'json'} onClick={() => changeCredentialMode('json')}>JSON key</button><button type="button" aria-pressed={credentialMode === 'manual'} onClick={() => changeCredentialMode('manual')}>Enter manually</button></div>
+              {credentialMode === 'json' ? <div className="credential-fields"><label htmlFor="json-key">Paste service-account JSON<textarea className={`secret-field${showPrivateKey ? ' is-visible' : ''}`} id="json-key" rows={3} maxLength={131072} autoComplete="off" spellCheck={false} value={jsonKey} placeholder="Paste the entire JSON file, including client_email and private_key" onChange={event => { fileReadId.current += 1; updateCredentials(blankCredentials()); setJsonKey(event.target.value); }} /></label><p className="hint">A complete JSON key works immediately with Find GA4 properties. No extra load step is required.</p><div className="key-actions"><button type="button" className="button secondary small" disabled={!jsonKey.trim()} onClick={() => { fileReadId.current += 1; importKey(jsonKey); }}>Load pasted key</button><label className="file-label" htmlFor="key-file">or upload .json<input key={fileVersion} id="key-file" type="file" accept=".json,application/json" onChange={event => { void uploadKey(event.target.files?.[0]); event.target.value = ''; }} /></label></div></div> :
+                <div className="credential-fields"><label htmlFor="client-email">Service-account email<input id="client-email" type="email" maxLength={254} autoComplete="off" spellCheck={false} value={credentials.client_email} placeholder="name@project.iam.gserviceaccount.com" onChange={event => { fileReadId.current += 1; updateCredentials({ ...credentials, client_email: event.target.value }); setJsonKey(''); }} /></label><label htmlFor="private-key">Private key <span className="hint">{showPrivateKey ? 'visible on screen' : 'hidden as you type'}</span><textarea className={`secret-field${showPrivateKey ? ' is-visible' : ''}`} id="private-key" rows={3} maxLength={16384} autoComplete="off" spellCheck={false} value={credentials.private_key} placeholder="-----BEGIN PRIVATE KEY-----" onChange={event => { fileReadId.current += 1; updateCredentials({ ...credentials, private_key: event.target.value }); setJsonKey(''); }} /></label><p className="hint">{'Both the email and private key are required. Actual line breaks and literal \\n sequences are supported.'}</p></div>}
               <button className="text-button" type="button" aria-pressed={showPrivateKey} aria-controls={credentialMode === 'json' ? 'json-key' : 'private-key'} onClick={() => setShowPrivateKey(visible => !visible)}>{showPrivateKey ? 'Hide private key' : 'Show private key'}</button>
               {keyError && <p className="inline-error" role="alert">{keyError}</p>}
               {keyNotice && <p className="key-notice" role="status">{keyNotice}</p>}
