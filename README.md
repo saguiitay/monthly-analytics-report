@@ -8,7 +8,8 @@ A bring-your-own-credentials analytics workspace for people managing multiple we
 - Discover accessible GA4 properties using your loaded key, then prefill a project without looking up its ID.
 - Compare 7, 30, or 90 days with the immediately preceding, equal-length period.
 - View page views, active users, sessions, and engagement rate for each project.
-- Explore daily traffic and acquisition-channel charts, plus top pages.
+- Scan compact daily traffic and acquisition-channel charts: four graphs across on desktop, stacked project cards on smaller screens.
+- Expand each project's Top pages section when needed; it starts collapsed.
 - Export reports as Markdown or JSON, or copy Markdown.
 - Try a clearly labeled demo without Google credentials.
 - Keep nonsecret project settings in local storage and credentials in this tab's session storage so refreshing preserves your connection.

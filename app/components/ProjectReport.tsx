@@ -41,7 +41,7 @@ export default function ProjectReport({ report, index }: { report: DashboardProj
         <section className="fingerprint" aria-labelledby={`${chartId}-traffic`}>
           <div className="chart-heading"><h3 id={`${chartId}-traffic`}>Traffic fingerprint</h3><span><i className="legend-dot" /> Daily pageviews</span></div>
           {daily.length ? <>
-            <svg className="traffic-chart" viewBox="0 0 600 170" role="img" aria-labelledby={`${chartId}-title ${chartId}-description`}>
+            <svg className="traffic-chart" viewBox="0 0 600 170" preserveAspectRatio="none" role="img" aria-labelledby={`${chartId}-title ${chartId}-description`}>
               <title id={`${chartId}-title`}>{report.project.name}: daily pageviews</title>
               <desc id={`${chartId}-description`}>{daily.length} days, from {daily[0].date} to {daily[daily.length - 1].date}. Maximum {number(Math.max(0, ...daily.map(day => day.pageViews)))} pageviews. Exact values are available in the daily data disclosure below.</desc>
               {[30, 95, 160].map(y => <line key={y} x1="16" x2="584" y1={y} y2={y} className="chart-gridline" />)}
@@ -67,7 +67,7 @@ export default function ProjectReport({ report, index }: { report: DashboardProj
         </section>
       </div>
       <div className="takeaway"><span aria-hidden="true">↳</span><p>{takeaway(report)}</p></div>
-      <details className="top-pages" open>
+      <details className="top-pages">
         <summary>Top pages <span className="hint">by pageviews</span></summary>
         {report.topPages.length ? <div className="table-scroll"><table><caption className="sr-only">Top pages for {report.project.name}</caption>
           <thead><tr><th>Page</th><th>Title</th><th>Pageviews</th></tr></thead>
