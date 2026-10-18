@@ -48,15 +48,17 @@ export function validateDashboardRequest(input: unknown, now = new Date()): Dash
     }
     ids.add(id);
     const name = text(project.name, 100, 'Project name');
-    const url = text(project.url, 2048, 'Project URL');
-    try {
-      const parsed = new URL(url);
-      if (!['https:', 'http:'].includes(parsed.protocol) || !parsed.hostname ||
-          parsed.username || parsed.password || /^[a-z]+:\/\/[^/]*@/i.test(url) || /[\\\s]/u.test(url)) {
-        throw new Error('invalid');
+    const url = project.url === '' ? '' : text(project.url, 2048, 'Project URL');
+    if (url) {
+      try {
+        const parsed = new URL(url);
+        if (!['https:', 'http:'].includes(parsed.protocol) || !parsed.hostname ||
+            parsed.username || parsed.password || /^[a-z]+:\/\/[^/]*@/i.test(url) || /[\\\s]/u.test(url)) {
+          throw new Error('invalid');
+        }
+      } catch {
+        throw new DashboardInputError('Project URL must be an http(s) URL without embedded credentials.');
       }
-    } catch {
-      throw new DashboardInputError('Project URL must be an http(s) URL without embedded credentials.');
     }
     const propertyId = text(project.propertyId, 20, 'GA4 property ID');
     if (!/^[1-9]\d{0,19}$/.test(propertyId)) {

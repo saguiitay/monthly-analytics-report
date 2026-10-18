@@ -23,7 +23,7 @@ export default function ProjectReport({ report, index }: { report: DashboardProj
       <header className="project-report-header">
         <div className="project-identity">
           <span className={`project-avatar tone-${index % 2}`} aria-hidden="true">{report.project.name.slice(0, 1).toUpperCase()}</span>
-          <div><h2 id={`${chartId}-heading`}>{report.project.name}</h2><p className="site-address">{report.project.url}</p></div>
+          <div><h2 id={`${chartId}-heading`} title={report.project.name}>{report.project.name}</h2><p className="site-address" title={report.project.url}>{report.project.url || 'No website URL'}</p></div>
         </div>
         <span className="period-tag">{shortDate(report.period.startDate)} – {shortDate(report.period.endDate)}</span>
       </header>
@@ -77,7 +77,6 @@ export default function ProjectReport({ report, index }: { report: DashboardProj
           <tbody>{report.topPages.map((page, i) => <tr key={`${page.path}-${i}`}><td className="page-path">{page.path}</td><td>{page.title || 'Untitled page'}</td><td>{number(page.pageViews)}</td></tr>)}</tbody>
         </table></div> : <p className="chart-empty">No pageviews recorded for individual pages.</p>}
       </details>
-      <footer className="comparison-period">Compared with {report.previousPeriod.startDate} – {report.previousPeriod.endDate}. Change is relative to the previous period; “New” means a zero baseline.</footer>
     </article>
   );
 }

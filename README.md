@@ -4,11 +4,13 @@ A bring-your-own-credentials analytics workspace for people managing multiple we
 
 ## What you get
 
-- Add, edit, and remove projects with a website URL and GA4 property ID.
-- Discover accessible GA4 properties using your loaded key, select several, and review their detected names and URLs before saving them together.
+- Add, edit, and remove projects with a GA4 property ID and optional website URL.
+- Discover accessible GA4 properties using your loaded key and add one or several immediately with their detected names and URLs.
+- Manage projects in compact, full-width tiles instead of side-by-side setup panels. Connection settings collapse after successful discovery or reporting and can be reopened at any time.
 - Compare 7, 30, or 90 days with the immediately preceding, equal-length period.
 - View page views, active users, sessions, and engagement rate for each project.
 - Scan compact daily traffic and acquisition-channel charts: four graphs across on desktop, stacked project cards on smaller screens.
+- Switch reports from **Standard** to **Mini** for four projects per desktop row, each showing pageviews, change, and one small daily traffic graph. Smaller screens reduce the column count; switch back for all metrics, channels, and tables. Exports always include the complete report.
 - Expand each project's Top pages section when needed; it starts collapsed.
 - Use keyboard-accessible setup controls, clear navigation states, and touch-sized mobile actions.
 - Export reports as Markdown or JSON, or copy Markdown.
@@ -44,14 +46,14 @@ npm start
 2. Create a service account under **IAM & Admin > Service Accounts**, then create a JSON key.
 3. In GA4, open **Admin > Property access management** and add the service-account email as a **Viewer** for each property you want to report on.
 4. In Monthly, import/paste the service-account JSON, or enter its email and private key.
-5. Choose **Find GA4 properties**. Use **Add property** for one project, or check multiple properties and choose **Add properties** to review them together. Check the prefilled names, IDs and website URLs, then save. Alternatively, add projects manually using the numeric property ID from GA4's property settings.
+5. Choose **Find GA4 properties**. Use **Add property** for one project, or check multiple properties and choose **Add properties**. Projects are added immediately with their detected names, IDs and website URLs; there is no review or extra save step. Use **Edit** afterward if needed. Alternatively, add projects manually using the numeric property ID from GA4's property settings.
 6. Choose a period and generate your report.
 
 Keys are hidden by default. Use **Show private key** / **Hide private key** to inspect the JSON or manual private-key field while editing. Switching entry methods, loading a new key, or clearing credentials hides the key again. Visibility is never saved.
 
 Manual private keys support actual line breaks, literal `\n` sequences, and Windows CRLF line breaks. The original text is retained for editing and normalized before authentication. Manual entry needs **both** the private key and matching service-account email. Alternatively, paste the entire service-account JSON: discovery and reports can use it immediately, without clicking **Load pasted key** first. If an entry is incomplete, **Find GA4 properties** explains what is missing instead of staying disabled.
 
-Property discovery and **Add property** remain available while editing projects. Replacing a nonempty project draft asks for confirmation. Successful discovery verifies the connection and clears the restored-but-unverified message.
+Property discovery and **Add property** remain available while editing projects. Adding discovered properties leaves an existing manual draft unchanged. Successful discovery verifies the connection, clears the restored-but-unverified message, and collapses connection settings. Select **Connection** in navigation or **Edit connection** to reopen them.
 
 Use a dedicated, least-privilege service account. Never commit a key or paste it into a report. Revoke a compromised key in Google Cloud.
 
@@ -72,9 +74,9 @@ Deploy as a Node.js Next.js application, not a static export. Run `npm run build
 
 Discovery uses the read-only [Analytics Admin API `accountSummaries.list`](https://developers.google.com/analytics/devguides/config/admin/v1/rest/v1beta/accountSummaries/list). It lists GA4 properties visible to the supplied service account, not Google Cloud projects. The private key alone is insufficient: the matching service-account email is also required.
 
-Discovered results stay in memory and are cleared when credentials change. Credentials themselves are kept in this tab's session storage across refreshes. **Load more properties** retrieves the next page of accounts without dropping earlier selections or creating duplicate projects. Selecting a property retrieves its web data streams and opens an editable form with the first website URL prefilled; nothing is saved until you choose **Save project**. If the property has multiple distinct website URLs, a notice explains which was selected. For app-only properties or streams without a URL, the form asks you to enter one manually. Lookup failures are shown explicitly and can be retried. Already-added properties are marked **Added**.
+Discovered results stay in memory and are cleared when credentials change. Credentials themselves are kept in this tab's session storage across refreshes. **Load more properties** retrieves the next page of accounts without dropping earlier selections or creating duplicate projects. **Add property** retrieves the property's web data streams and immediately saves it with the first website URL, if available. If it has multiple distinct website URLs, a notice explains which was selected. App-only properties and streams without a URL are added without one: reporting uses the property ID, not the website URL. Use **Edit** to change the name or optional URL later. Lookup failures are shown explicitly and can be retried. Already-added properties are marked **Added**.
 
-For multiple properties, check individual rows or use **Select all** (or **Select first N** when workspace capacity is limited), then choose **Add properties**. Selections survive pagination. Website lookups run with at most three concurrent requests; a failed lookup leaves the selection and any current draft intact for retry. **Cancel lookup** stops pending requests without dropping the selection. Review, edit, or remove projects in the batch before saving all remaining projects together. Missing URLs, duplicate properties and the 12-project workspace limit are validated before anything is saved. Canceling the review leaves saved projects unchanged.
+For multiple properties, check individual rows or use **Select all** (or **Select first N** when workspace capacity is limited), then choose **Add properties**. Selections survive pagination. Website lookups run with at most three concurrent requests; a failed lookup adds nothing and leaves the selection and any current draft intact for retry. **Cancel lookup** stops pending requests without dropping the selection. Duplicate properties and the 12-project workspace limit are validated before adding the entire selection. After successful single or bulk addition, the discovery list collapses; choose **Show GA4 properties** to reopen it without another request. Saved properties survive refreshes when local storage is available; storage failures are shown with a retry action.
 
 `POST /api/properties` accepts `{ "credentials": { "client_email": "...", "private_key": "..." }, "pageToken": "optional opaque token" }` and returns `{ "properties": [{ "propertyId": "12345", "name": "My website", "accountName": "My account" }], "nextPageToken": null }`. Supply a returned token to fetch the next page. It uses the same bounded JSON input, credential validation, same-origin checks, and no-store response policy as reporting. Invalid requests return a client error; Google failures return an actionable, credential-safe error and a non-success status. A disabled Admin API does not prevent manually configured Data API reporting.
 
@@ -116,7 +118,7 @@ For multiple properties, check individual rows or use **Select all** (or **Selec
 }
 ```
 
-The request supports 1-12 projects and `days` of `7`, `30`, or `90`. The end date must be a real calendar date and not in the future. Browser requests must be same-origin.
+The request supports 1-12 projects and `days` of `7`, `30`, or `90`. The `url` field must be a string: use `""` when the property has no website URL, or a full HTTP(S) URL without embedded credentials. Reporting queries use `propertyId`, not `url`. The end date must be a real calendar date and not in the future. Browser requests must be same-origin.
 
 Responses contain `reports`, per-project `errors`, and `generatedAt`. Each successful report includes the original project, both date ranges, current/previous metrics, daily traffic, channels, and top pages. Invalid requests return a client error. If every project fails, the response is non-successful and still includes the structured project errors. Provider error details and credentials are not returned.
 

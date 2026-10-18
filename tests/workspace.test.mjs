@@ -39,7 +39,7 @@ test('project validation rejects non-reporting IDs and unsafe site links', () =>
   }
 });
 
-test('batch review requires complete projects and enforces the exact twelve-project workspace limit', () => {
+test('batch addition accepts optional URLs and enforces the exact twelve-project workspace limit', () => {
   const drafts = Array.from({ length: 12 }, (_, index) => ({
     ...project, id: `batch-${index}`, name: `Site ${index + 1}`, propertyId: `${index + 1}`,
   }));
@@ -47,16 +47,29 @@ test('batch review requires complete projects and enforces the exact twelve-proj
   assert.equal(validateProjectBatch([project], drafts.slice(0, 11)), null);
   assert.match(validateProjectBatch([project], drafts), /12 projects/);
   assert.match(validateProjectBatch([], []), /at least one/);
-  assert.match(validateProjectBatch([], [{ ...drafts[0], url: '' }]), /Site 1:.*URL/);
+  assert.equal(validateProjectBatch([], [{ ...drafts[0], url: '' }]), null);
   assert.match(validateProjectBatch([], [{ ...drafts[0], url: 'javascript:alert(1)' }]), /Site 1:.*URL/);
   assert.match(validateProjectBatch([], [{ ...drafts[0], name: '' }]), /Project:.*name/);
 });
 
-test('batch review rejects existing and repeated property IDs or project identifiers', () => {
+test('batch addition rejects existing and repeated property IDs or project identifiers', () => {
   assert.match(validateProjectBatch([project], [{ ...project, id: 'new-site' }]), /already/);
   assert.match(validateProjectBatch([project], [{ ...project, propertyId: '234567890' }]), /identifiers/);
   assert.match(validateProjectBatch([], [project, { ...project, id: 'new-site' }]), /more than once/);
   assert.match(validateProjectBatch([], [project, { ...project, propertyId: '234567890' }]), /identifiers/);
+});
+
+test('properties without a website URL survive a workspace storage round trip', () => {
+  let stored;
+  const appProject = { ...project, url: '' };
+  assert.equal(validateProject(appProject), null);
+  saveWorkspace({ setItem(key, value) { assert.equal(key, WORKSPACE_KEY); stored = value; } }, [appProject]);
+  assert.deepEqual(readWorkspace({ getItem: () => stored }), [appProject]);
+  for (const url of [undefined, null, 1, {}, '   ']) {
+    assert.throws(() => readWorkspace({ getItem: () => JSON.stringify({
+      version: 1, projects: [{ ...project, url }],
+    }) }));
+  }
 });
 
 test('demo is deterministic, complete and explicitly labeled in credential-free exports', () => {

@@ -7,6 +7,7 @@ export function validateProject(project: WorkspaceProject): string | null {
   if (!/^[a-zA-Z0-9_-]{1,80}$/.test(project.id)) return 'Use a valid project identifier.';
   if (!project.name.trim() || project.name.length > 100 || /[\u0000-\u001f\u007f]/u.test(project.name)) return 'Give your project a name of 1–100 characters without control characters.';
   if (!/^[1-9]\d{0,19}$/.test(project.propertyId)) return 'Use the numeric GA4 property ID (up to 20 digits), not a measurement ID.';
+  if (project.url === '') return null;
   try {
     const url = new URL(project.url);
     if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || !url.hostname ||

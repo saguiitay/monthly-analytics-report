@@ -35,6 +35,16 @@ test('accepts literal backslash-n and escaped CRLF private keys as well as actua
   }
 });
 
+test('accepts an explicit empty website URL but rejects missing or nonstring metadata', () => {
+  const input = valid();
+  input.projects[0].url = '';
+  assert.equal(validateDashboardRequest(input, now).projects[0].url, '');
+  for (const url of [undefined, null, 1, {}, [], '   ']) {
+    input.projects[0].url = url;
+    assert.throws(() => validateDashboardRequest(input, now), DashboardInputError);
+  }
+});
+
 test('rejects malformed, incomplete and unsupported request shapes', () => {
   for (const input of [null, [], 1, {}, { ...valid(), credentials: null }, { ...valid(), extra: true }]) {
     assert.throws(() => validateDashboardRequest(input, now), DashboardInputError);

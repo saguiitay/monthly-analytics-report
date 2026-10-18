@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import type { DiscoveredProperty, DiscoveredPropertyDraft, PropertyDiscoveryResponse, PropertyWebsiteResponse, ServiceAccountCredentials, WorkspaceProject } from '../lib/dashboard-types';
 import Icon from './Icon';
 
-export default function PropertyDiscovery({ credentials, projects, connectionError, disabled, onChoose, onVerified }: {
+export default function PropertyDiscovery({ credentials, projects, connectionError, disabled, onAdd, onVerified }: {
   credentials: ServiceAccountCredentials;
   projects: WorkspaceProject[];
   connectionError: string | null;
   disabled: boolean;
-  onChoose: (properties: DiscoveredPropertyDraft[]) => boolean;
+  onAdd: (properties: DiscoveredPropertyDraft[]) => string | null;
   onVerified: () => void;
 }) {
   const [result, setResult] = useState<PropertyDiscoveryResponse | null>(null);
@@ -19,10 +19,11 @@ export default function PropertyDiscovery({ credentials, projects, connectionErr
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [completed, setCompleted] = useState(0);
   const [notice, setNotice] = useState('');
+  const [expanded, setExpanded] = useState(false);
   const controller = useRef<AbortController | null>(null);
   const requestId = useRef(0);
   const busy = useRef(false);
-  const callbacks = useRef({ onChoose, onVerified });
+  const callbacks = useRef({ onAdd, onVerified });
   const selectAll = useRef<HTMLInputElement>(null);
   const availableSlots = Math.max(0, 12 - projects.length);
   const available = result?.properties.filter(property => !projects.some(project => project.propertyId === property.propertyId)) ?? [];
@@ -34,7 +35,7 @@ export default function PropertyDiscovery({ credentials, projects, connectionErr
     if (selectAll.current) selectAll.current.indeterminate = selected.length > 0 && !allSelected;
   }, [selected.length, allSelected]);
 
-  useEffect(() => { callbacks.current = { onChoose, onVerified }; }, [onChoose, onVerified]);
+  useEffect(() => { callbacks.current = { onAdd, onVerified }; }, [onAdd, onVerified]);
 
   useEffect(() => {
     setSelectedIds(current => current.filter(id => !projects.some(project => project.propertyId === id)).slice(0, Math.max(0, 12 - projects.length)));
@@ -100,6 +101,7 @@ export default function PropertyDiscovery({ credentials, projects, connectionErr
         properties: [...new Map([...(more ? previous?.properties ?? [] : []), ...data.properties].map(property => [property.propertyId, property])).values()],
         nextPageToken: data.nextPageToken,
       }));
+      setExpanded(true);
       callbacks.current.onVerified();
     } catch {
       if (id === requestId.current && !abort.signal.aborted) setError('Could not reach property discovery. Check your connection, then try again.');
@@ -120,7 +122,7 @@ export default function PropertyDiscovery({ credentials, projects, connectionErr
     setSelectedIds(current => checked ? [...current, propertyId] : current.filter(id => id !== propertyId));
   }
 
-  async function chooseProperties(properties: DiscoveredProperty[]) {
+  async function addProperties(properties: DiscoveredProperty[]) {
     if (busy.current || disabled) return;
     if (connectionError) { setError(connectionError); return; }
     if (projects.length + properties.length > 12) {
@@ -169,14 +171,17 @@ export default function PropertyDiscovery({ credentials, projects, connectionErr
       }));
       if (id !== requestId.current) return;
       callbacks.current.onVerified();
-      if (callbacks.current.onChoose(drafts)) {
+      const addError = callbacks.current.onAdd(drafts);
+      if (addError) {
+        setError(addError);
+      } else {
         setSelectedIds(current => current.filter(propertyId => !properties.some(property => property.propertyId === propertyId)));
+        setExpanded(false);
         const missing = drafts.filter(property => !property.url).length;
         setNotice([
-          missing ? drafts.length === 1
-            ? 'This property has no website URL in its web data streams. Enter Site URL manually before saving.'
-            : `GA4 returned no website URL for ${missing} selected ${missing === 1 ? 'property' : 'properties'}. Complete any missing Site URLs before saving.` : '',
-          multipleWebsites ? 'Some properties have multiple websites. The first web stream URL is prefilled; you can edit Site URL before saving.' : '',
+          `Added ${drafts.length} ${drafts.length === 1 ? 'property' : 'properties'}.`,
+          missing ? `${missing} ${missing === 1 ? 'property has' : 'properties have'} no website URL. Reporting still works; use Edit to add an optional URL.` : '',
+          multipleWebsites ? 'For properties with multiple websites, the first web stream URL was used. You can change it with Edit.' : '',
         ].filter(Boolean).join(' '));
       }
     } catch {
@@ -194,10 +199,12 @@ export default function PropertyDiscovery({ credentials, projects, connectionErr
 
   return (
     <div className="property-discovery">
+      <div className="property-discovery-heading">
       <button type="button" className="button secondary small" disabled={disabled || loading || selecting !== null} onClick={() => void findProperties()}>
         {loading ? 'Finding GA4 properties…' : result ? 'Refresh GA4 properties' : 'Find GA4 properties'}
       </button>
-      <p className="hint">{!connectionError ? 'Find properties this key can access, then add one or select several to review together.' : 'Paste the full service-account JSON, or enter both its email and private key, in Google Analytics.'}</p>
+      <p className="hint">{!connectionError ? 'Find properties this key can access. Add one or select several.' : 'Paste the full service-account JSON, or enter both its email and private key, in Google Analytics.'}</p>
+      </div>
       {projects.length >= 12 && <p className="hint">Your workspace has 12 projects. Remove one before adding another discovered property.</p>}
       {loading && <p className="hint" role="status">Reading accessible properties from Google Analytics…</p>}
       {selecting && <div className="property-lookup-progress"><p className="hint" role="status">Reading website URLs: {completed} of {selecting.length} {selecting.length === 1 ? 'property' : 'properties'}…</p><button className="text-button" type="button" onClick={() => {
@@ -210,7 +217,8 @@ export default function PropertyDiscovery({ credentials, projects, connectionErr
       }}>Cancel lookup</button></div>}
       {error && <p className="inline-error" role="alert">{error}</p>}
       {notice && <p className="hint" role="status">{notice}</p>}
-      {result && <div className="discovered-properties">
+      {result && <details className="discovered-properties" open={expanded} onToggle={event => setExpanded(event.currentTarget.open)}>
+        <summary><Icon name="chevron" />{expanded ? 'Available GA4 properties' : 'Show GA4 properties'}<span className="count-badge">{result.properties.length}</span></summary>
         <p className="hint" role="status">{result.properties.length} {result.properties.length === 1 ? 'property' : 'properties'} found{result.nextPageToken ? ' so far. More results are available.' : '.'}</p>
         {!result.properties.length && !result.nextPageToken && <p className="hint">No accessible GA4 properties were returned. Add this service account as a Viewer in GA4 Property access management, then refresh. You can also add a property manually.</p>}
         {available.length > 0 && availableSlots > 0 && <>
@@ -219,21 +227,21 @@ export default function PropertyDiscovery({ credentials, projects, connectionErr
               setError('');
               setSelectedIds(event.target.checked ? firstAvailable.map(property => property.propertyId) : []);
             }} />{available.length > availableSlots ? `Select first ${availableSlots}` : 'Select all'}</label>
-            <button type="button" className="button primary small" disabled={disabled || loading || selecting !== null || selected.length === 0} onClick={() => void chooseProperties(selected)}>Add {selected.length === 1 ? 'property' : 'properties'}{selected.length ? ` (${selected.length})` : ''}</button>
+            <button type="button" className="button primary small" disabled={disabled || loading || selecting !== null || selected.length === 0} onClick={() => void addProperties(selected)}>Add {selected.length === 1 ? 'property' : 'properties'}{selected.length ? ` (${selected.length})` : ''}</button>
           </div>
-          <p className="hint">Select up to {availableSlots} {availableSlots === 1 ? 'property' : 'properties'}. Review their names and URLs together before saving.</p>
+          <p className="hint">Add up to {availableSlots} more {availableSlots === 1 ? 'property' : 'properties'}. No extra save step.</p>
         </>}
         <ul className="property-options">
           {result.properties.map(property => {
             const added = projects.some(project => project.propertyId === property.propertyId);
             return <li key={property.propertyId}>
               <label className="property-choice"><input type="checkbox" aria-label={`Select ${property.name} (${property.propertyId})`} checked={added || selectedIds.includes(property.propertyId)} disabled={added || disabled || loading || selecting !== null} onChange={event => toggleProperty(property.propertyId, event.target.checked)} /><span className="property-option-info"><strong>{property.name}</strong><span>{property.accountName} · {property.propertyId}</span></span></label>
-              {added ? <span className="hint">Added</span> : <button className="text-button" type="button" disabled={disabled || loading || selecting !== null} aria-label={`Add ${property.name} (${property.propertyId})`} onClick={() => void chooseProperties([property])}>{selecting?.includes(property.propertyId) ? 'Loading website…' : 'Add property'}<Icon name="arrow" /></button>}
+              {added ? <span className="hint">Added</span> : <button className="text-button" type="button" disabled={disabled || loading || selecting !== null} aria-label={`Add ${property.name} (${property.propertyId})`} onClick={() => void addProperties([property])}>{selecting?.includes(property.propertyId) ? 'Loading website…' : 'Add property'}<Icon name="arrow" /></button>}
             </li>;
           })}
         </ul>
         {result.nextPageToken && <button className="text-button" type="button" disabled={loading || disabled || selecting !== null} onClick={() => void findProperties(true)}>Load more properties</button>}
-      </div>}
+      </details>}
     </div>
   );
 }
