@@ -44,6 +44,8 @@ npm start
 5. In Monthly, add your projects and import/paste the service-account JSON, or enter its email and private key.
 6. Choose a period and generate your report.
 
+Keys are hidden by default. Use **Show private key** / **Hide private key** to inspect the JSON or manual private-key field while editing. Switching entry methods, loading a new key, or clearing credentials hides the key again. Visibility is never saved.
+
 Use a dedicated, least-privilege service account. Never commit a key or paste it into a report. Revoke a compromised key in Google Cloud.
 
 ## Privacy and hosting

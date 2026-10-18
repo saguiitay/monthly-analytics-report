@@ -28,6 +28,7 @@ export default function Home() {
   const [keyNotice, setKeyNotice] = useState('');
   const [fileVersion, setFileVersion] = useState(0);
   const [credentialMode, setCredentialMode] = useState<'json' | 'manual'>('json');
+  const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [verified, setVerified] = useState(false);
   const [days, setDays] = useState<7 | 30 | 90>(30);
   const [endDate, setEndDate] = useState(yesterday);
@@ -81,6 +82,7 @@ export default function Home() {
 
   function forgetCredentials() {
     fileReadId.current += 1;
+    setShowPrivateKey(false);
     updateCredentials(blankCredentials());
     setJsonKey('');
     setFileVersion(value => value + 1);
@@ -97,6 +99,7 @@ export default function Home() {
       const next = { client_email: key.client_email.trim(), private_key: key.private_key.replace(/\\n/g, '\n').trim() };
       if (!validCredentials(next)) throw new Error('Invalid key');
       updateCredentials(next);
+      setShowPrivateKey(false);
       setJsonKey('');
       setKeyNotice('Service-account key loaded in memory. Access is not verified yet.');
     } catch {
@@ -107,6 +110,7 @@ export default function Home() {
   async function uploadKey(file: File | undefined) {
     const current = ++fileReadId.current;
     if (!file) return;
+    setShowPrivateKey(false);
     updateCredentials(blankCredentials());
     setJsonKey('');
     if (file.size > 131072 || (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json')) {
@@ -280,9 +284,10 @@ export default function Home() {
             <section className="panel connection-panel" id="connection" aria-labelledby="connection-heading">
               <div className="section-header"><div><p className="eyebrow">BRING YOUR OWN KEY</p><h2 id="connection-heading">Google Analytics</h2></div><span className={`status-pill ${verified ? 'connected' : ''}`}><span aria-hidden="true">●</span> {verified ? 'Access verified' : hasKey ? 'Key entered · unverified' : 'Not connected'}</span></div>
               <p className="section-copy">Connect with a service-account JSON key. Your key is never saved to browser storage.</p>
-              <div className="input-tabs" aria-label="Credential entry method"><button type="button" aria-pressed={credentialMode === 'json'} onClick={() => setCredentialMode('json')}>JSON key</button><button type="button" aria-pressed={credentialMode === 'manual'} onClick={() => setCredentialMode('manual')}>Enter manually</button></div>
-              {credentialMode === 'json' ? <div className="credential-fields"><label htmlFor="json-key">Paste service-account JSON<textarea className="secret-field" id="json-key" rows={3} autoComplete="off" spellCheck={false} value={jsonKey} placeholder="Paste the contents of your JSON key file" onChange={event => { fileReadId.current += 1; updateCredentials(blankCredentials()); setJsonKey(event.target.value); }} /></label><div className="key-actions"><button type="button" className="button secondary small" disabled={!jsonKey.trim()} onClick={() => { fileReadId.current += 1; importKey(jsonKey); }}>Load pasted key</button><label className="file-label" htmlFor="key-file">or upload .json<input key={fileVersion} id="key-file" type="file" accept=".json,application/json" onChange={event => { void uploadKey(event.target.files?.[0]); event.target.value = ''; }} /></label></div></div> :
-                <div className="credential-fields"><label htmlFor="client-email">Service-account email<input id="client-email" type="email" autoComplete="off" spellCheck={false} value={credentials.client_email} placeholder="name@project.iam.gserviceaccount.com" onChange={event => { fileReadId.current += 1; updateCredentials({ ...credentials, client_email: event.target.value }); setJsonKey(''); }} /></label><label htmlFor="private-key">Private key <span className="hint">hidden as you type</span><textarea className="secret-field" id="private-key" rows={3} autoComplete="off" spellCheck={false} value={credentials.private_key} placeholder="-----BEGIN PRIVATE KEY-----" onChange={event => { fileReadId.current += 1; updateCredentials({ ...credentials, private_key: event.target.value }); setJsonKey(''); }} /></label></div>}
+              <div className="input-tabs" aria-label="Credential entry method"><button type="button" aria-pressed={credentialMode === 'json'} onClick={() => { setCredentialMode('json'); setShowPrivateKey(false); }}>JSON key</button><button type="button" aria-pressed={credentialMode === 'manual'} onClick={() => { setCredentialMode('manual'); setShowPrivateKey(false); }}>Enter manually</button></div>
+              {credentialMode === 'json' ? <div className="credential-fields"><label htmlFor="json-key">Paste service-account JSON<textarea className={`secret-field${showPrivateKey ? ' is-visible' : ''}`} id="json-key" rows={3} autoComplete="off" spellCheck={false} value={jsonKey} placeholder="Paste the contents of your JSON key file" onChange={event => { fileReadId.current += 1; updateCredentials(blankCredentials()); setJsonKey(event.target.value); }} /></label><div className="key-actions"><button type="button" className="button secondary small" disabled={!jsonKey.trim()} onClick={() => { fileReadId.current += 1; importKey(jsonKey); }}>Load pasted key</button><label className="file-label" htmlFor="key-file">or upload .json<input key={fileVersion} id="key-file" type="file" accept=".json,application/json" onChange={event => { void uploadKey(event.target.files?.[0]); event.target.value = ''; }} /></label></div></div> :
+                <div className="credential-fields"><label htmlFor="client-email">Service-account email<input id="client-email" type="email" autoComplete="off" spellCheck={false} value={credentials.client_email} placeholder="name@project.iam.gserviceaccount.com" onChange={event => { fileReadId.current += 1; updateCredentials({ ...credentials, client_email: event.target.value }); setJsonKey(''); }} /></label><label htmlFor="private-key">Private key <span className="hint">{showPrivateKey ? 'visible on screen' : 'hidden as you type'}</span><textarea className={`secret-field${showPrivateKey ? ' is-visible' : ''}`} id="private-key" rows={3} autoComplete="off" spellCheck={false} value={credentials.private_key} placeholder="-----BEGIN PRIVATE KEY-----" onChange={event => { fileReadId.current += 1; updateCredentials({ ...credentials, private_key: event.target.value }); setJsonKey(''); }} /></label></div>}
+              <button className="text-button" type="button" aria-pressed={showPrivateKey} aria-controls={credentialMode === 'json' ? 'json-key' : 'private-key'} onClick={() => setShowPrivateKey(visible => !visible)}>{showPrivateKey ? 'Hide private key' : 'Show private key'}</button>
               {keyError && <p className="inline-error" role="alert">{keyError}</p>}
               {keyNotice && <p className="key-notice" role="status">{keyNotice}</p>}
               {(hasKey || jsonKey) && <button className="text-button forget-button" type="button" onClick={forgetCredentials}>Clear & forget credentials</button>}
