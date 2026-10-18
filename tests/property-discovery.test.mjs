@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { generateKeyPairSync } from 'node:crypto';
-import { validatePropertyDiscoveryRequest } from '../app/lib/dashboard-validation.ts';
-import { discoverProperties, normalizePropertyPage, safePropertyDiscoveryError } from '../app/lib/services/property-discovery.ts';
+import { validatePropertyDiscoveryRequest, validatePropertyWebsiteRequest } from '../app/lib/dashboard-validation.ts';
+import { discoverProperties, discoverPropertyWebsite, normalizeDataStreamPage, normalizePropertyPage, safePropertyDiscoveryError } from '../app/lib/services/property-discovery.ts';
 
 const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const credentials = {
@@ -97,4 +97,66 @@ test('discovery preserves provider failure for safe HTTP classification instead 
   for (const error of [new Error('PRIVATE_PROVIDER_DETAIL'), { code: 401, message: 'PRIVATE_PROVIDER_DETAIL' }, null]) {
     assert.doesNotMatch(safePropertyDiscoveryError(error), /PRIVATE_PROVIDER_DETAIL/);
   }
+});
+
+test('website lookup validates credentials and a numeric property ID without allowing API path injection', () => {
+  assert.deepEqual(validatePropertyWebsiteRequest({ credentials, propertyId: '12345' }), {
+    credentials: { ...credentials, private_key: credentials.private_key.trim() }, propertyId: '12345',
+  });
+  for (const input of [
+    null, {}, { propertyId: '12345' }, { credentials, propertyId: '12345', url: 'https://example.com' },
+    ...['0', '', 'G-12345', 'properties/12345', '../12345', '1'.repeat(21), 12345, null].map(propertyId => ({ credentials, propertyId })),
+  ]) assert.throws(() => validatePropertyWebsiteRequest(input));
+});
+
+const webStream = defaultUri => ({ type: 'WEB_DATA_STREAM', webStreamData: { defaultUri } });
+
+test('website lookup uses real web stream URLs, deduplicates them and does not guess URLs for app streams', () => {
+  assert.deepEqual(normalizeDataStreamPage({ dataStreams: [
+    { type: 'ANDROID_APP_DATA_STREAM', androidAppStreamData: { packageName: 'com.example.app' } },
+    { type: 'IOS_APP_DATA_STREAM', webStreamData: { defaultUri: 'https://not-a-web-stream.example' } },
+    webStream(' https://example.com/blog '), webStream('https://example.com/blog'),
+    webStream('http://second.example'), webStream(null), webStream(''),
+  ], nextPageToken: 'second-page' }), {
+    urls: ['https://example.com/blog', 'http://second.example'], nextPageToken: 'second-page',
+  });
+  assert.deepEqual(normalizeDataStreamPage({}), { urls: [], nextPageToken: null });
+});
+
+test('website lookup rejects malformed pages and unsafe URLs instead of returning misleading empty results', () => {
+  for (const input of [
+    null, [], { dataStreams: {} }, { dataStreams: [null] }, { nextPageToken: 12 },
+    ...['javascript:alert(1)', 'ftp://example.com', 'https://user:pass@example.com', 'https://example.com\\path',
+      'https://example.com/white space', 'https://example.com/' + 'x'.repeat(2048), 123].map(defaultUri => ({ dataStreams: [webStream(defaultUri)] })),
+  ]) assert.throws(() => normalizeDataStreamPage(input));
+});
+
+test('website lookup follows pagination with isolated credentials and handles app-only properties', async () => {
+  const calls = [];
+  const result = await discoverPropertyWebsite({ credentials, propertyId: '12345' }, async (input, signal) => {
+    calls.push(input);
+    assert.equal(signal.aborted, false);
+    return input.pageToken
+      ? { dataStreams: [webStream('https://example.com'), webStream('https://other.example')] }
+      : { dataStreams: [webStream('https://example.com')], nextPageToken: 'second-page' };
+  });
+  assert.deepEqual(result, { urls: ['https://example.com', 'https://other.example'] });
+  assert.deepEqual(calls, [
+    { credentials, propertyId: '12345' },
+    { credentials, propertyId: '12345', pageToken: 'second-page' },
+  ]);
+  assert.deepEqual(await discoverPropertyWebsite({ credentials, propertyId: '12345' }, async () => ({
+    dataStreams: [{ type: 'ANDROID_APP_DATA_STREAM' }],
+  })), { urls: [] });
+  assert.equal(JSON.stringify(result).includes('PRIVATE KEY'), false);
+  assert.equal(JSON.stringify(result).includes(credentials.client_email), false);
+});
+
+test('website lookup preserves provider failures and rejects cyclic or unbounded pagination', async () => {
+  const error = { response: { status: 403 }, message: 'PRIVATE_PROVIDER_DETAIL' };
+  await assert.rejects(discoverPropertyWebsite({ credentials, propertyId: '12345' }, async () => { throw error; }), value => value === error);
+  await assert.rejects(discoverPropertyWebsite({ credentials, propertyId: '12345' }, async () => ({ nextPageToken: 'repeat' })), /pagination/);
+  let calls = 0;
+  await assert.rejects(discoverPropertyWebsite({ credentials, propertyId: '12345' }, async () => ({ nextPageToken: `next-${++calls}` })), /pagination/);
+  assert.equal(calls, 11);
 });

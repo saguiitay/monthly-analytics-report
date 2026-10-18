@@ -26,6 +26,15 @@ export interface PropertyDiscoveryResponse {
   nextPageToken: string | null;
 }
 
+export interface PropertyWebsiteRequest {
+  credentials: ServiceAccountCredentials;
+  propertyId: string;
+}
+
+export interface PropertyWebsiteResponse {
+  urls: string[];
+}
+
 export interface DashboardRequest {
   projects: WorkspaceProject[];
   credentials: ServiceAccountCredentials;

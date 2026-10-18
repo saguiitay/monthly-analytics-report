@@ -1,5 +1,5 @@
 import { createPrivateKey } from 'node:crypto';
-import type { DashboardRequest, DashboardResponse, WorkspaceProject, ServiceAccountCredentials, PropertyDiscoveryRequest } from './dashboard-types';
+import type { DashboardRequest, DashboardResponse, WorkspaceProject, ServiceAccountCredentials, PropertyDiscoveryRequest, PropertyWebsiteRequest } from './dashboard-types';
 
 export const MAX_DASHBOARD_BODY_BYTES = 256 * 1024;
 
@@ -109,6 +109,15 @@ export function validatePropertyDiscoveryRequest(input: unknown): PropertyDiscov
     credentials,
     ...(data.pageToken === undefined ? {} : { pageToken: text(data.pageToken, 4096, 'Page token') }),
   };
+}
+
+export function validatePropertyWebsiteRequest(input: unknown): PropertyWebsiteRequest {
+  const data = object(input, ['credentials', 'propertyId'], 'Request');
+  const propertyId = text(data.propertyId, 20, 'GA4 property ID');
+  if (!/^[1-9]\d{0,19}$/.test(propertyId)) {
+    throw new DashboardInputError('Use the numeric GA4 property ID, not a G- measurement ID.');
+  }
+  return { credentials: validateServiceAccountCredentials(data.credentials), propertyId };
 }
 
 export function enforceDashboardOrigin(request: Request): void {

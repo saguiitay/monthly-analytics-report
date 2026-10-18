@@ -42,14 +42,14 @@ npm start
 2. Create a service account under **IAM & Admin > Service Accounts**, then create a JSON key.
 3. In GA4, open **Admin > Property access management** and add the service-account email as a **Viewer** for each property you want to report on.
 4. In Monthly, import/paste the service-account JSON, or enter its email and private key.
-5. Choose **Find GA4 properties**, select **Use property**, enter the website URL, and save. The name and property ID are prefilled. Alternatively, add projects manually using the numeric property ID from GA4's property settings.
+5. Choose **Find GA4 properties**, select **Use property**, review the prefilled name, property ID and website URL, and save. Alternatively, add projects manually using the numeric property ID from GA4's property settings.
 6. Choose a period and generate your report.
 
 Keys are hidden by default. Use **Show private key** / **Hide private key** to inspect the JSON or manual private-key field while editing. Switching entry methods, loading a new key, or clearing credentials hides the key again. Visibility is never saved.
 
 Manual private keys support actual line breaks, literal `\n` sequences, and Windows CRLF line breaks. The original text is retained for editing and normalized before authentication. Manual entry needs **both** the private key and matching service-account email. Alternatively, paste the entire service-account JSON: discovery and reports can use it immediately, without clicking **Load pasted key** first. If an entry is incomplete, **Find GA4 properties** explains what is missing instead of staying disabled.
 
-Property discovery remains available while editing a project. Save or cancel the current edit before selecting a discovered property so unfinished project details are not overwritten.
+Property discovery and **Use property** remain available while editing a project. Replacing a nonempty project draft asks for confirmation. Successful discovery verifies the connection and clears the restored-but-unverified message.
 
 Use a dedicated, least-privilege service account. Never commit a key or paste it into a report. Revoke a compromised key in Google Cloud.
 
@@ -64,15 +64,17 @@ Use a dedicated, least-privilege service account. Never commit a key or paste it
 - Reports remain in page memory unless you copy or download them. A report can contain sensitive business data; share exports deliberately.
 - There is no account system, tenant database, billing, or server-side workspace persistence. This release is a self-hosted tool, **not a hardened public multi-tenant SaaS**. Restrict deployment access with your hosting provider or an authenticated reverse proxy. Add authentication, abuse controls/rate limiting, and an operational privacy policy before offering it publicly.
 
-Deploy as a Node.js Next.js application, not a static export. Run `npm run build` and `npm start`, or use a Next.js-compatible hosting service. Do not configure request-body logging or caching for `/api/dashboard` or `/api/properties`.
+Deploy as a Node.js Next.js application, not a static export. Run `npm run build` and `npm start`, or use a Next.js-compatible hosting service. Do not configure request-body logging or caching for `/api/dashboard`, `/api/properties`, or `/api/property-website`.
 
 ## Property discovery
 
 Discovery uses the read-only [Analytics Admin API `accountSummaries.list`](https://developers.google.com/analytics/devguides/config/admin/v1/rest/v1beta/accountSummaries/list). It lists GA4 properties visible to the supplied service account, not Google Cloud projects. The private key alone is insufficient: the matching service-account email is also required.
 
-Discovered results stay in memory and are cleared when credentials change. Credentials themselves are kept in this tab's session storage across refreshes. **Load more properties** retrieves the next page of accounts without dropping earlier selections or creating duplicate projects. Selecting a property opens an editable project form; nothing is saved until you enter a site URL and choose **Save project**. The API does not provide a website URL in its property summaries, so Monthly does not guess one. Already-added properties are marked **Added**.
+Discovered results stay in memory and are cleared when credentials change. Credentials themselves are kept in this tab's session storage across refreshes. **Load more properties** retrieves the next page of accounts without dropping earlier selections or creating duplicate projects. Selecting a property retrieves its web data streams and opens an editable form with the first website URL prefilled; nothing is saved until you choose **Save project**. If the property has multiple distinct website URLs, a notice explains which was selected. For app-only properties or streams without a URL, the form asks you to enter one manually. Lookup failures are shown explicitly and can be retried. Already-added properties are marked **Added**.
 
 `POST /api/properties` accepts `{ "credentials": { "client_email": "...", "private_key": "..." }, "pageToken": "optional opaque token" }` and returns `{ "properties": [{ "propertyId": "12345", "name": "My website", "accountName": "My account" }], "nextPageToken": null }`. Supply a returned token to fetch the next page. It uses the same bounded JSON input, credential validation, same-origin checks, and no-store response policy as reporting. Invalid requests return a client error; Google failures return an actionable, credential-safe error and a non-success status. A disabled Admin API does not prevent manually configured Data API reporting.
+
+`POST /api/property-website` accepts `{ "credentials": { "client_email": "...", "private_key": "..." }, "propertyId": "12345" }` and returns `{ "urls": ["https://example.com"] }` using the read-only Admin API `properties.dataStreams.list`. It follows stream pagination, deduplicates valid HTTP(S) web URLs, ignores app streams, and applies the same input, origin and no-store protections.
 
 ## How to read the numbers
 
