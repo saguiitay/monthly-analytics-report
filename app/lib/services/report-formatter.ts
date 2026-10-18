@@ -1,4 +1,4 @@
-import { ProjectReport, DetailedProjectReport } from '../types';
+import { ProjectReport, DetailedProjectReport, DetailedAnalyticsMetrics } from '../types';
 
 export class ReportFormatter {
   /**
@@ -227,7 +227,7 @@ ${reports.map(report => ReportFormatter.formatDetailedProjectReport(report)).joi
   /**
    * Analyze metrics and identify strategic problems
    */
-  static identifyStrategicProblems(metrics: any): string[] {
+  static identifyStrategicProblems(metrics: DetailedAnalyticsMetrics): string[] {
     const problems: string[] = [];
     
     // Search performance issues

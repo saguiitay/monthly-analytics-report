@@ -1,7 +1,7 @@
 import { AnalyticsService } from './analytics';
 import { SearchConsoleService } from './search-console';
 import { ReportFormatter } from './report-formatter';
-import { ProjectConfig, ProjectReport, DetailedProjectReport, ReportType, DetailedAnalyticsMetrics } from '../types';
+import { ProjectConfig, ProjectReport, DetailedProjectReport, DetailedAnalyticsMetrics } from '../types';
 import { format } from 'date-fns';
 
 export class ReportGenerator {

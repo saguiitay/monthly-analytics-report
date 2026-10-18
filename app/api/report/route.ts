@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ReportGenerator } from '../../lib/services/report-generator';
 import { ReportFormatter } from '../../lib/services/report-formatter';
-import { ProjectConfig, ProjectReport, DetailedProjectReport, ReportType } from '../../lib/types';
+import { ProjectConfig, ProjectReport, DetailedProjectReport } from '../../lib/types';
 
 export async function POST(request: NextRequest) {
   try {

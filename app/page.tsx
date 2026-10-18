@@ -1,213 +1,313 @@
 'use client';
 
-import { useState } from 'react';
-import { ProjectConfig, ReportType } from './lib/types';
+import { useEffect, useRef, useState } from 'react';
+import type { DashboardRequest, DashboardResponse, ServiceAccountCredentials, WorkspaceProject } from './lib/dashboard-types';
+import { createDemo } from './lib/demo';
+import { exportData, number, projectSettings, readWorkspace, reportMarkdown, saveWorkspace, validateProject } from './lib/workspace';
+import ProjectReport from './components/ProjectReport';
 
+const blankProject = (): WorkspaceProject => ({ id: '', name: '', url: '', propertyId: '' });
+const blankCredentials = (): ServiceAccountCredentials => ({ client_email: '', private_key: '' });
+const today = () => new Date().toISOString().slice(0, 10);
+const yesterday = () => new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+function validCredentials(credentials: ServiceAccountCredentials) {
+  return /^[^\s@]+@[^\s@]+\.gserviceaccount\.com$/.test(credentials.client_email.trim()) &&
+    credentials.private_key.trim().startsWith('-----BEGIN PRIVATE KEY-----') &&
+    credentials.private_key.trim().endsWith('-----END PRIVATE KEY-----');
+}
 export default function Home() {
+  const [projects, setProjects] = useState<WorkspaceProject[]>([]);
+  const [ready, setReady] = useState(false);
+  const [storageError, setStorageError] = useState('');
+  const [editor, setEditor] = useState<WorkspaceProject | null>(null);
+  const [projectError, setProjectError] = useState('');
+  const [credentials, setCredentials] = useState<ServiceAccountCredentials>(blankCredentials);
+  const [jsonKey, setJsonKey] = useState('');
+  const [keyError, setKeyError] = useState('');
+  const [keyNotice, setKeyNotice] = useState('');
+  const [fileVersion, setFileVersion] = useState(0);
+  const [credentialMode, setCredentialMode] = useState<'json' | 'manual'>('json');
+  const [verified, setVerified] = useState(false);
+  const [days, setDays] = useState<7 | 30 | 90>(30);
+  const [endDate, setEndDate] = useState(yesterday);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ markdown: string, summary: string, reportType: ReportType } | null>(null);
-  const [copySuccess, setCopySuccess] = useState(false);
-  const [endDate, setEndDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [reportType, setReportType] = useState<ReportType>('summary');
+  const [error, setError] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [report, setReport] = useState<DashboardResponse | null>(null);
+  const [demo, setDemo] = useState(false);
+  const controller = useRef<AbortController | null>(null);
+  const requestId = useRef(0);
+  const busy = useRef(false);
+  const fileReadId = useRef(0);
+  const editorName = useRef<HTMLInputElement>(null);
+  const resultsSection = useRef<HTMLElement>(null);
+  const resultsHeading = useRef<HTMLHeadingElement>(null);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setLoading(true);
-    setError(null);
-    setResult(null);
+  useEffect(() => {
+    try { setProjects(readWorkspace(window.localStorage)); }
+    catch { setStorageError('Saved projects could not be read. Nothing was overwritten. You can use this workspace in memory, then save projects again.'); }
+    setReady(true);
+    return () => { controller.current?.abort(); fileReadId.current += 1; };
+  }, []);
 
-    // Example project config
-    const projects: ProjectConfig[] = [
-      {
-        name: 'Calculation Hub',
-        url: 'https://calculation-hub.com/',
-        gaPropertyId: '479179989',
-        gscSiteUrl: 'sc-domain:calculation-hub.com',
-        domain: 'calculation-hub.com'
-      },
-      {
-        name: 'Rangom Generatr',
-        url: 'https://randomgeneratr.com/',
-        gaPropertyId: '405238687',
-        gscSiteUrl: 'sc-domain:randomgeneratr.com',
-        domain: 'randomgeneratr.com'
-      },
-      {
-        name: 'Shibutz',
-        url: 'https://shibutz.com/',
-        gaPropertyId: '446114465',
-        gscSiteUrl: 'sc-domain:shibutz.com',
-        domain: 'shibutz.com'
-      },
-      {
-        name: 'ASCII Art Generator',
-        url: 'https://ascii-images.com',
-        gaPropertyId: '481852240',
-        gscSiteUrl: 'sc-domain:ascii-images.com',
-        domain: 'ascii-images.com'
-      },
-      {
-        name: 'Peronality Tests',
-        url: 'https://personal-tests.com/',
-        gaPropertyId: '486670475',
-        gscSiteUrl: 'sc-domain:personal-tests.com',
-        domain: 'personal-tests.com'
-      },
-      // {
-      //   name: 'Binge Waste',
-      //   url: 'https://binge-waste.com',
-      //   gaPropertyId: '440738598',
-      //   gscSiteUrl: 'sc-domain:binge-waste.com',
-      //   domain: 'binge-waste.com'
-      // },
-      {
-        name: 'Cursive Generation',
-        url: 'https://cursive-generation.com',
-        gaPropertyId: '487230425',
-        gscSiteUrl: 'sc-domain:cursive-generation.com',
-        domain: 'cursive-generation.com'
-      },
-      {
-        name: 'Bike Size',
-        url: 'https://bike-size.com',
-        gaPropertyId: '488843706',
-        gscSiteUrl: 'sc-domain:bike-size.com',
-        domain: 'bike-size.com'
-      },
-    ];
-
-    try {
-      const response = await fetch('/api/report', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          projects,
-          title: 'Monthly Analytics Report',
-          endDate: endDate || undefined,
-          reportType
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to generate report');
-      }
-
-      const data = await response.json();
-      setResult(data);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'An error occurred');
-    } finally {
-      setLoading(false);
+  const editorId = editor?.id;
+  useEffect(() => { if (editorId !== undefined) editorName.current?.focus(); }, [editorId]);
+  useEffect(() => {
+    if (report) {
+      resultsSection.current?.scrollIntoView({ block: 'start' });
+      resultsHeading.current?.focus({ preventScroll: true });
     }
-  };
+  }, [report]);
+
+  function invalidate() {
+    requestId.current += 1;
+    controller.current?.abort();
+    busy.current = false;
+    setLoading(false);
+    setReport(null);
+    setDemo(false);
+    setError('');
+    setFeedback('');
+  }
+
+  function updateCredentials(next: ServiceAccountCredentials) {
+    invalidate();
+    setCredentials(next);
+    setVerified(false);
+    setKeyError('');
+    setKeyNotice('');
+  }
+
+  function forgetCredentials() {
+    fileReadId.current += 1;
+    updateCredentials(blankCredentials());
+    setJsonKey('');
+    setFileVersion(value => value + 1);
+    setKeyNotice('Credentials cleared from this workspace.');
+  }
+
+  function importKey(raw: string) {
+    try {
+      if (raw.length > 131072) throw new Error('Too large');
+      const parsed: unknown = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') throw new Error('Invalid key');
+      const key = parsed as Record<string, unknown>;
+      if (key.type !== 'service_account' || typeof key.client_email !== 'string' || typeof key.private_key !== 'string') throw new Error('Invalid key');
+      const next = { client_email: key.client_email.trim(), private_key: key.private_key.replace(/\\n/g, '\n').trim() };
+      if (!validCredentials(next)) throw new Error('Invalid key');
+      updateCredentials(next);
+      setJsonKey('');
+      setKeyNotice('Service-account key loaded in memory. Access is not verified yet.');
+    } catch {
+      setKeyError('Use a valid Google service-account JSON key (under 128 KB), including client_email and private_key. A Measurement Protocol API secret will not work.');
+    }
+  }
+
+  async function uploadKey(file: File | undefined) {
+    const current = ++fileReadId.current;
+    if (!file) return;
+    updateCredentials(blankCredentials());
+    setJsonKey('');
+    if (file.size > 131072 || (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json')) {
+      setKeyError('Choose a JSON service-account key file smaller than 128 KB.');
+      return;
+    }
+    try {
+      const raw = await file.text();
+      if (fileReadId.current === current) importKey(raw);
+    } catch {
+      if (fileReadId.current === current) setKeyError('This file could not be read. Try another file or paste the JSON key.');
+    }
+  }
+
+  function persist(next: WorkspaceProject[]) {
+    invalidate();
+    setProjects(next);
+    try {
+      saveWorkspace(window.localStorage, next);
+      setStorageError('');
+    } catch {
+      setStorageError('Browser storage is unavailable or full. Your changes work in this tab but will not survive a reload. Allow site storage and choose “Retry saving.”');
+    }
+
+  }
+
+  function openEditor(project: WorkspaceProject) {
+    invalidate();
+    setEditor(project);
+    setProjectError('');
+  }
+
+  function saveProject(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editor) return;
+    const next = projectSettings({ ...editor, id: editor.id || crypto.randomUUID() });
+    const message = validateProject(next);
+    if (message) { setProjectError(message); return; }
+    if (projects.some(project => project.id !== next.id && project.propertyId === next.propertyId)) {
+      setProjectError('This property is already in your workspace. Edit its existing project instead.');
+      return;
+    }
+    persist(editor.id ? projects.map(project => project.id === next.id ? next : project) : [...projects, next]);
+    setEditor(null);
+    setProjectError('');
+  }
+
+  async function generate(event?: React.FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    if (busy.current || demo) return;
+    setFeedback('');
+    if (editor) { setError('Save or cancel the project you are editing before generating a report.'); return; }
+    if (!projects.length) { setError('Add at least one project to generate a report.'); return; }
+    if (!validCredentials(credentials)) { setError('Load a service-account JSON key or enter its email and private key first.'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate) || !Number.isFinite(Date.parse(`${endDate}T12:00:00Z`)) || endDate > today()) {
+      setError('Choose a valid end date that is not in the future.'); return;
+    }
+    busy.current = true;
+    setLoading(true);
+    setError('');
+    setReport(null);
+    setVerified(false);
+    controller.current?.abort();
+    const abort = new AbortController();
+    controller.current = abort;
+    const id = ++requestId.current;
+    const payload: DashboardRequest = {
+      projects: projects.map(projectSettings),
+      credentials: { client_email: credentials.client_email.trim(), private_key: credentials.private_key.replace(/\\n/g, '\n').trim() },
+      days,
+      endDate,
+    };
+    try {
+      const response = await fetch('/api/dashboard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: abort.signal, cache: 'no-store' });
+      if (id !== requestId.current) return;
+      const data = await response.json() as DashboardResponse & { error?: string };
+      if (!Array.isArray(data.reports) || !Array.isArray(data.errors) || typeof data.generatedAt !== 'string') throw new Error('Invalid response');
+      if (id !== requestId.current) return;
+      if (!response.ok) {
+        if (data.errors.length) {
+          setReport(data);
+          setError('No projects could be loaded. Follow the guidance for each project below, then try again.');
+          return;
+        }
+        setError(typeof data.error === 'string' ? data.error : response.status === 401 || response.status === 403
+          ? 'Google did not grant access. Check your service-account key, enable the Analytics Data API, and add the service account as a Viewer on each GA4 property.'
+          : response.status === 429 ? 'Too many requests. Wait a moment, then try again.'
+            : response.status === 400 ? 'The request could not be accepted. Check the key format, numeric property IDs, and reporting dates.'
+              : 'The report could not be generated. Check your connection and GA4 access, then try again.');
+        return;
+      }
+      setReport(data);
+      setVerified(data.reports.length > 0);
+      if (!data.reports.length && !data.errors.length) setError('No project results were returned. Check the selected properties and try again.');
+    } catch {
+      if (id === requestId.current && !abort.signal.aborted) setError('Monthly could not reach the report service. Check your connection and try again.');
+    } finally {
+      if (id === requestId.current) { busy.current = false; setLoading(false); }
+    }
+  }
+
+  function exploreDemo() {
+    invalidate();
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(endDate) && Number.isFinite(Date.parse(endDate)) ? endDate : yesterday();
+    setReport(createDemo(days, date));
+    setDemo(true);
+  }
+
+  function download(format: 'json' | 'md') {
+    if (!report) return;
+    try {
+      const body = format === 'json' ? JSON.stringify(exportData(report, demo), null, 2) : reportMarkdown(report, demo);
+      const blob = new Blob([body], { type: format === 'json' ? 'application/json' : 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `monthly-${demo ? 'demo-' : ''}${report.reports[0]?.period.endDate || endDate}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setFeedback(`${format === 'json' ? 'JSON' : 'Markdown'} download prepared. No credentials included.`);
+    } catch { setFeedback('Download could not be prepared. Try copying the Markdown instead.'); }
+  }
+
+  async function copyReport() {
+    if (!report) return;
+    try {
+      await navigator.clipboard.writeText(reportMarkdown(report, demo));
+      setFeedback('Markdown copied. No credentials included.');
+    } catch { setFeedback('Clipboard access was blocked. Use the Markdown download instead.'); }
+  }
+
+  const totalPageViews = report?.reports.reduce((total, project) => total + project.metrics.pageViews.current, 0) ?? 0;
+  const totalUsers = report?.reports.reduce((total, project) => total + project.metrics.activeUsers.current, 0) ?? 0;
+  const hasKey = !!credentials.client_email || !!credentials.private_key;
 
   return (
-    <main className="min-h-screen p-8">
-      <h1 className="text-3xl font-bold mb-8">
-        Monthly Analytics Report Generator
-      </h1>
+    <div className="workspace-shell">
+      <a className="skip-link" href="#main">Skip to workspace</a>
+      <aside className="sidebar" aria-label="Workspace navigation">
+        <a className="brand" href="#" aria-label="Monthly home"><span className="brand-mark" aria-hidden="true">m</span>monthly<span className="brand-period">.</span></a>
+        <div className="nav-caption">YOUR WORKSPACE</div>
+        <nav><a className="nav-item active" href="#overview"><span aria-hidden="true">▦</span> Overview</a><a className="nav-item" href="#projects"><span aria-hidden="true">▱</span> Projects <span className="nav-count">{projects.length}</span></a><a className="nav-item" href="#connection"><span aria-hidden="true">⌁</span> Connection</a></nav>
+        <div className="sidebar-bottom"><span className="local-dot" /> Browser-local workspace<p>Your projects stay here.<br />Your key stays in memory.</p><a href="#privacy">How privacy works <span aria-hidden="true">↗</span></a></div>
+      </aside>
+      <div className="workspace-body">
+        <header className="topbar"><div><span className="breadcrumb">Workspace</span><span aria-hidden="true"> / </span><span>Overview</span></div><span className="private-label"><span aria-hidden="true">◈</span> Your analytics. Your key.</span></header>
+        <main id="main">
+          <section className="page-intro" id="overview"><div><p className="eyebrow">A LITTLE PERSPECTIVE, EVERY MONTH</p><h1>Know what’s <em>moving.</em></h1><p className="intro-copy">Your projects, side by side. Less digging through analytics.<br className="desktop-break" /> More understanding what changed.</p></div><button className="button secondary demo-button" type="button" onClick={exploreDemo}>Explore demo <span aria-hidden="true">↗</span></button></section>
 
-      <form onSubmit={handleSubmit} className="mb-8">
-        <div className="flex gap-4 items-end">
-          <div className="flex flex-col gap-2">
-            <label htmlFor="reportType" className="text-sm font-medium text-gray-700">
-              Report Type
-            </label>
-            <select
-              id="reportType"
-              value={reportType}
-              onChange={(e) => setReportType(e.target.value as ReportType)}
-              className="px-4 py-2 border rounded"
-              aria-label="Report type"
-            >
-              <option value="summary">Summary Report</option>
-              <option value="detailed">Detailed Report</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="endDate" className="text-sm font-medium text-gray-700">
-              End Date
-            </label>
-            <input
-              id="endDate"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="px-4 py-2 border rounded"
-              aria-label="Report end date"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className={`px-6 py-2 bg-blue-500 text-white rounded ${
-              loading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
-            }`}
-          >
-            {loading ? 'Generating...' : `Generate ${reportType === 'detailed' ? 'Detailed' : 'Summary'} Report`}
-          </button>
-        </div>
+          <div className="setup-grid">
+            <section className="panel projects-panel" id="projects" aria-labelledby="projects-heading">
+              <div className="section-header"><div><p className="eyebrow">THE THINGS YOU’RE BUILDING</p><h2 id="projects-heading">Your projects <span className="count-badge">{projects.length}</span></h2></div><button type="button" className="button small secondary" disabled={!ready || projects.length >= 12 || !!editor} onClick={() => openEditor(blankProject())}>+ Add project</button></div>
+              <p className="section-copy">Saved only in this browser. Add the GA4 properties you want to compare.</p>
+              {!ready ? <p className="empty-inline">Opening your workspace…</p> : projects.length === 0 && !editor ? <div className="project-empty"><span className="empty-symbol" aria-hidden="true">＋</span><p>A home for your side projects.</p><span>Add your first project, or explore the demo.</span><button className="text-button" type="button" onClick={() => openEditor(blankProject())}>Add your first project →</button></div> : null}
+              {projects.length > 0 && <ul className="saved-projects">{projects.map((project, index) => <li key={project.id}>
+                <span className={`project-avatar small-avatar tone-${index % 2}`} aria-hidden="true">{project.name.slice(0, 1).toUpperCase()}</span><div className="saved-project-info"><strong>{project.name}</strong><span>{project.url}</span><span className="property-label">GA4 · {project.propertyId}</span></div><div className="project-actions"><button className="text-button" type="button" disabled={!!editor} aria-label={`Edit ${project.name}`} onClick={() => openEditor({ ...project })}>Edit</button><button className="remove-button" type="button" disabled={!!editor} aria-label={`Remove ${project.name}`} onClick={() => { if (window.confirm(`Remove ${project.name} from this browser workspace?`)) persist(projects.filter(item => item.id !== project.id)); }}>×</button></div>
+              </li>)}</ul>}
+              {editor && <form className="project-editor" onSubmit={saveProject}>
+                <h3>{editor.id ? 'Edit project' : 'Add a project'}</h3>
+                <label htmlFor="project-name">Project name<input ref={editorName} id="project-name" required maxLength={100} value={editor.name} placeholder="My next good idea" onChange={event => setEditor({ ...editor, name: event.target.value })} /></label>
+                <div className="form-columns"><label htmlFor="project-url">Site URL<input id="project-url" type="url" required maxLength={2048} placeholder="https://example.com" value={editor.url} onChange={event => setEditor({ ...editor, url: event.target.value })} /></label><label htmlFor="property-id">GA4 property ID<input id="property-id" inputMode="numeric" pattern="[1-9][0-9]{0,19}" required maxLength={20} placeholder="Numeric ID" value={editor.propertyId} onChange={event => setEditor({ ...editor, propertyId: event.target.value })} /></label></div>
+                <p className="hint">Find the numeric ID in GA4 → Admin → Property details. Not the G- measurement ID.</p>
+                {projectError && <p className="inline-error" role="alert">{projectError}</p>}
+                <div className="editor-buttons"><button className="button primary small" type="submit">Save project</button><button className="button secondary small" type="button" onClick={() => { setEditor(null); setProjectError(''); }}>Cancel</button></div>
+              </form>}
+              {storageError && <div className="notice warning" role="alert"><p>{storageError}</p><button className="text-button" type="button" onClick={() => { try { saveWorkspace(window.localStorage, projects); setStorageError(''); } catch { setStorageError('Still unable to save. Your projects are available only in this tab.'); } }}>Retry saving</button></div>}
+            </section>
 
-        
-      </form>
-
-      {error && (
-        <div className="p-4 mb-8 bg-red-100 text-red-700 rounded">
-          <h3 className="font-bold mb-2">Error Generating Report</h3>
-          <p className="mb-4">{error}</p>
-          <div className="text-sm">
-            <p className="mb-2">Please verify:</p>
-            <ul className="list-disc list-inside">
-              <li>Google Analytics Data API is enabled in your Google Cloud Console</li>
-              <li>Search Console API is enabled and the service account has access</li>
-              <li>Service account credentials are correctly formatted in .env.local</li>
-              <li>Project configuration (propertyId, siteUrl, domain) is correct</li>
-            </ul>
-          </div>
-        </div>
-      )}
-
-      {result && (
-        <div>
-          <h2 className="text-2xl font-bold mb-4">
-            {result.reportType === 'detailed' ? 'Detailed Report' : 'Summary Report'} Generated
-          </h2>
-
-          <div className="mb-8">
-            <h3 className="text-xl font-semibold mb-2">Summary</h3>
-            <pre className="p-4 bg-gray-100 rounded overflow-x-auto text-sm">
-              {result.summary}
-            </pre>
+            <section className="panel connection-panel" id="connection" aria-labelledby="connection-heading">
+              <div className="section-header"><div><p className="eyebrow">BRING YOUR OWN KEY</p><h2 id="connection-heading">Google Analytics</h2></div><span className={`status-pill ${verified ? 'connected' : ''}`}><span aria-hidden="true">●</span> {verified ? 'Access verified' : hasKey ? 'Key entered · unverified' : 'Not connected'}</span></div>
+              <p className="section-copy">Connect with a service-account JSON key. Your key is never saved to browser storage.</p>
+              <div className="input-tabs" aria-label="Credential entry method"><button type="button" aria-pressed={credentialMode === 'json'} onClick={() => setCredentialMode('json')}>JSON key</button><button type="button" aria-pressed={credentialMode === 'manual'} onClick={() => setCredentialMode('manual')}>Enter manually</button></div>
+              {credentialMode === 'json' ? <div className="credential-fields"><label htmlFor="json-key">Paste service-account JSON<textarea className="secret-field" id="json-key" rows={3} autoComplete="off" spellCheck={false} value={jsonKey} placeholder="Paste the contents of your JSON key file" onChange={event => { fileReadId.current += 1; updateCredentials(blankCredentials()); setJsonKey(event.target.value); }} /></label><div className="key-actions"><button type="button" className="button secondary small" disabled={!jsonKey.trim()} onClick={() => { fileReadId.current += 1; importKey(jsonKey); }}>Load pasted key</button><label className="file-label" htmlFor="key-file">or upload .json<input key={fileVersion} id="key-file" type="file" accept=".json,application/json" onChange={event => { void uploadKey(event.target.files?.[0]); event.target.value = ''; }} /></label></div></div> :
+                <div className="credential-fields"><label htmlFor="client-email">Service-account email<input id="client-email" type="email" autoComplete="off" spellCheck={false} value={credentials.client_email} placeholder="name@project.iam.gserviceaccount.com" onChange={event => { fileReadId.current += 1; updateCredentials({ ...credentials, client_email: event.target.value }); setJsonKey(''); }} /></label><label htmlFor="private-key">Private key <span className="hint">hidden as you type</span><textarea className="secret-field" id="private-key" rows={3} autoComplete="off" spellCheck={false} value={credentials.private_key} placeholder="-----BEGIN PRIVATE KEY-----" onChange={event => { fileReadId.current += 1; updateCredentials({ ...credentials, private_key: event.target.value }); setJsonKey(''); }} /></label></div>}
+              {keyError && <p className="inline-error" role="alert">{keyError}</p>}
+              {keyNotice && <p className="key-notice" role="status">{keyNotice}</p>}
+              {(hasKey || jsonKey) && <button className="text-button forget-button" type="button" onClick={forgetCredentials}>Clear & forget credentials</button>}
+              <details className="setup-help"><summary>How to connect your account</summary><ol><li>In Google Cloud, enable the <strong>Google Analytics Data API</strong>.</li><li>Create a service account and download a JSON key. Keep it private.</li><li>In each GA4 property, open Admin → Property access management. Add the service-account email with the <strong>Viewer</strong> role.</li><li>Load the JSON key here, add the numeric property IDs, and generate a report.</li></ol><p>A Measurement Protocol API secret cannot read reports and is not supported.</p></details>
+            </section>
           </div>
 
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xl font-semibold">Markdown Report</h3>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(result.markdown);
-                  setCopySuccess(true);
-                  setTimeout(() => setCopySuccess(false), 2000);
-                }}
-                className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded flex items-center gap-2 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-                {copySuccess ? 'Copied!' : 'Copy Markdown'}
-              </button>
-            </div>
-            <pre className="p-4 bg-gray-100 rounded overflow-x-auto text-sm max-h-96 overflow-y-auto">
-              {result.markdown}
-            </pre>
-          </div>
-        </div>
-      )}
-    </main>
+          <form className="report-toolbar" onSubmit={generate} aria-label="Report settings">
+            <div className="report-toolbar-title"><span className="toolbar-icon" aria-hidden="true">◷</span><div><h2>Your reporting window</h2><p>Compared with the preceding equal-length period.<br />Recent GA4 data may still be incomplete.</p></div></div>
+            <div className="report-controls"><label htmlFor="report-days">Date range<select id="report-days" value={days} onChange={event => { invalidate(); setDays(Number(event.target.value) as 7 | 30 | 90); }}><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option></select></label><label htmlFor="end-date">Ending on<input id="end-date" type="date" required max={today()} value={endDate} onChange={event => { invalidate(); setEndDate(event.target.value); }} /></label><button className="button primary generate-button" type="submit" disabled={!ready || loading || demo}>{loading ? 'Reading your analytics…' : 'Generate report'}<span aria-hidden="true">{loading ? '◌' : '→'}</span></button></div>
+          </form>
+          {demo && <div className="notice demo-notice" role="status"><div><strong>You’re exploring a demo.</strong><p>Two fictional projects. Deterministic synthetic data, not real analytics. Your saved projects are unchanged. No request is sent.</p></div><button className="button secondary small" type="button" onClick={invalidate}>Exit demo</button></div>}
+          {error && <div className="notice error-notice" role="alert"><div><strong>Let’s get your report working.</strong><p>{error}</p></div><button className="button secondary small" type="button" onClick={() => void generate()} disabled={loading || demo}>Try again</button></div>}
+          {loading && <div className="loading-state" role="status"><span className="loading-dot" /> Reading your GA4 properties. Your key is used only for this request.</div>}
+          {report && <section ref={resultsSection} className="results" aria-labelledby="results-heading">
+            <div className="results-header"><div><p className="eyebrow">{demo ? 'SYNTHETIC DEMO REPORT' : 'THE BIG PICTURE'}</p><h2 ref={resultsHeading} tabIndex={-1} id="results-heading">A clearer view of your projects.</h2><p className="section-copy">{report.reports.length} of {report.reports.length + report.errors.length} projects available · {demo ? 'Demo snapshot' : `Generated ${new Date(report.generatedAt).toLocaleString()}`}</p></div><div className="export-actions"><button className="button secondary small" type="button" onClick={copyReport}>Copy Markdown</button><button className="button secondary small" type="button" onClick={() => download('md')}>↓ Markdown</button><button className="button secondary small" type="button" onClick={() => download('json')}>↓ JSON</button></div></div>
+            {feedback && <p className="export-feedback" role="status">{feedback}</p>}
+            {report.reports.length > 0 && <div className="overview-strip"><div><span>Total pageviews</span><strong>{number(totalPageViews)}</strong></div><div><span>Users · sum across properties</span><strong>{number(totalUsers)}</strong></div><p>Users are <strong>not deduplicated</strong> across properties. Each project’s total is unique within that property.</p></div>}
+            {report.errors.length > 0 && <div className="notice warning"><div><strong>{report.reports.length ? 'Some properties need attention.' : 'No properties could be read.'}</strong><p>{report.reports.length ? 'Available results are shown below. ' : ''}Check the service account’s Viewer access, the numeric property IDs, and that the Analytics Data API is enabled.</p><ul>{report.errors.map((failure, index) => <li key={`${failure.project.id}-${index}`}><strong>{failure.project.name}</strong> — <span>{failure.message}</span></li>)}</ul></div><button className="button secondary small" type="button" onClick={() => void generate()} disabled={loading || demo}>Retry report</button></div>}
+            {report.reports.map((project, index) => <ProjectReport key={project.project.id} report={project} index={index} />)}
+          </section>}
+          {!report && !loading && <section className="report-placeholder"><div className="placeholder-fingerprint" aria-hidden="true"><svg viewBox="0 0 320 90"><path d="M0 66 L22 60 L40 68 L58 40 L78 49 L98 33 L118 46 L138 22 L158 35 L178 30 L198 51 L218 28 L238 34 L258 13 L278 23 L300 10 L320 17" /></svg></div><p className="eyebrow">YOUR NEXT CHECK-IN STARTS HERE</p><h2>Every project has a pattern.</h2><p>Add your projects and connect Google Analytics to find yours.<br />Or <button className="text-button" type="button" onClick={exploreDemo}>explore the demo</button> — no key needed.</p></section>}
+          <footer className="privacy-footer" id="privacy"><div className="footer-wordmark">monthly.</div><p><strong>Private by design, not by promise.</strong> Project names, URLs, and property IDs are saved in this browser’s local storage, not a cloud account. Credentials live only in this tab’s memory and are sent over your connection to this app’s report server, which uses them to query Google Analytics. They are not intentionally stored or included in exports. Closing or refreshing the tab forgets the key. Use a trusted deployment over HTTPS.</p><span>Built for the things you build.</span></footer>
+        </main>
+      </div>
+    </div>
   );
 }
