@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { DiscoveredProperty, PropertyDiscoveryResponse, PropertyWebsiteResponse, ServiceAccountCredentials, WorkspaceProject } from '../lib/dashboard-types';
+import Icon from './Icon';
 
 export default function PropertyDiscovery({ credentials, projects, connectionError, disabled, onChoose, onVerified }: {
   credentials: ServiceAccountCredentials;
@@ -159,7 +160,7 @@ export default function PropertyDiscovery({ credentials, projects, connectionErr
             const added = projects.some(project => project.propertyId === property.propertyId);
             return <li key={property.propertyId}>
               <div><strong>{property.name}</strong><span>{property.accountName} · {property.propertyId}</span></div>
-              {added ? <span className="hint">Added</span> : <button className="text-button" type="button" disabled={disabled || loading || selecting !== null} aria-label={`Use ${property.name} (${property.propertyId})`} onClick={() => void chooseProperty(property)}>{selecting === property.propertyId ? 'Loading website…' : 'Use property'}</button>}
+              {added ? <span className="hint">Added</span> : <button className="text-button" type="button" disabled={disabled || loading || selecting !== null} aria-label={`Use ${property.name} (${property.propertyId})`} onClick={() => void chooseProperty(property)}>{selecting === property.propertyId ? 'Loading website…' : 'Use property'}<Icon name="arrow" /></button>}
             </li>;
           })}
         </ul>

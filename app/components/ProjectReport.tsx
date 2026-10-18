@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import type { DashboardProjectReport } from '../lib/dashboard-types';
 import { delta, number, percent, takeaway } from '../lib/workspace';
+import Icon from './Icon';
 
 function shortDate(date: string) {
   return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
@@ -52,7 +53,7 @@ export default function ProjectReport({ report, index }: { report: DashboardProj
             <div className="chart-endpoints" aria-hidden="true"><span>{shortDate(daily[0].date)}</span><span>{shortDate(daily[daily.length - 1].date)}</span></div>
             {allZero && <p className="chart-empty">No pageviews recorded during this period.</p>}
           </> : <p className="chart-empty">No daily data returned for this period.</p>}
-          <details className="data-disclosure"><summary>View daily data <span aria-hidden="true">↗</span></summary>
+          <details className="data-disclosure"><summary><Icon name="chevron" />View daily data</summary>
             <div className="table-scroll"><table><caption className="sr-only">Daily traffic for {report.project.name}</caption><thead><tr><th>Date</th><th>Pageviews</th><th>Active users</th></tr></thead>
               <tbody>{daily.map(day => <tr key={day.date}><td>{day.date}</td><td>{number(day.pageViews)}</td><td>{number(day.activeUsers)}</td></tr>)}</tbody></table></div>
             <p className="hint">Daily active users are not additive. The Users card uses GA4’s unique users for the full period.</p>
@@ -68,7 +69,7 @@ export default function ProjectReport({ report, index }: { report: DashboardProj
       </div>
       <div className="takeaway"><span aria-hidden="true">↳</span><p>{takeaway(report)}</p></div>
       <details className="top-pages">
-        <summary>Top pages <span className="hint">by pageviews</span></summary>
+        <summary><Icon name="chevron" />Top pages <span className="hint">by pageviews</span></summary>
         {report.topPages.length ? <div className="table-scroll"><table><caption className="sr-only">Top pages for {report.project.name}</caption>
           <thead><tr><th>Page</th><th>Title</th><th>Pageviews</th></tr></thead>
           <tbody>{report.topPages.map((page, i) => <tr key={`${page.path}-${i}`}><td className="page-path">{page.path}</td><td>{page.title || 'Untitled page'}</td><td>{number(page.pageViews)}</td></tr>)}</tbody>

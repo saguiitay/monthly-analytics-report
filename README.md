@@ -10,6 +10,7 @@ A bring-your-own-credentials analytics workspace for people managing multiple we
 - View page views, active users, sessions, and engagement rate for each project.
 - Scan compact daily traffic and acquisition-channel charts: four graphs across on desktop, stacked project cards on smaller screens.
 - Expand each project's Top pages section when needed; it starts collapsed.
+- Use keyboard-accessible setup controls, clear navigation states, and touch-sized mobile actions.
 - Export reports as Markdown or JSON, or copy Markdown.
 - Try a clearly labeled demo without Google credentials.
 - Keep nonsecret project settings in local storage and credentials in this tab's session storage so refreshing preserves your connection.
