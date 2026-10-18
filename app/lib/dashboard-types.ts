@@ -16,6 +16,10 @@ export interface DiscoveredProperty {
   accountName: string;
 }
 
+export interface DiscoveredPropertyDraft extends DiscoveredProperty {
+  url: string;
+}
+
 export interface PropertyDiscoveryRequest {
   credentials: ServiceAccountCredentials;
   pageToken?: string;

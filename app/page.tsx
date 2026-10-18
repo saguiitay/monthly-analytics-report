@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { DashboardRequest, DashboardResponse, DiscoveredProperty, ServiceAccountCredentials, WorkspaceProject } from './lib/dashboard-types';
+import type { DashboardRequest, DashboardResponse, DiscoveredPropertyDraft, ServiceAccountCredentials, WorkspaceProject } from './lib/dashboard-types';
 import { createDemo } from './lib/demo';
-import { exportData, number, projectSettings, readWorkspace, reportMarkdown, saveWorkspace, validateProject } from './lib/workspace';
+import { exportData, number, projectSettings, readWorkspace, reportMarkdown, saveWorkspace, validateProject, validateProjectBatch } from './lib/workspace';
 import ProjectReport from './components/ProjectReport';
 import PropertyDiscovery from './components/PropertyDiscovery';
 import Icon from './components/Icon';
+import ProjectFields from './components/ProjectFields';
 import { CREDENTIAL_SESSION_KEY, parseServiceAccountJson, readCredentialSession, resolveSessionCredentials, saveCredentialSession } from './lib/credential-session';
 
 const blankProject = (): WorkspaceProject => ({ id: '', name: '', url: '', propertyId: '' });
@@ -20,6 +21,7 @@ export default function Home() {
   const [ready, setReady] = useState(false);
   const [storageError, setStorageError] = useState('');
   const [editor, setEditor] = useState<WorkspaceProject | null>(null);
+  const [batchEditor, setBatchEditor] = useState<WorkspaceProject[] | null>(null);
   const [projectError, setProjectError] = useState('');
   const [credentials, setCredentials] = useState<ServiceAccountCredentials>(blankCredentials);
   const [credentialStorageReady, setCredentialStorageReady] = useState(false);
@@ -91,7 +93,8 @@ export default function Home() {
     }
   }, [credentials, jsonKey, credentialMode, credentialStorageReady]);
 
-  const editorId = editor?.id;
+  const editing = editor !== null || batchEditor !== null;
+  const editorId = editor?.id ?? batchEditor?.[0]?.id;
   useEffect(() => { if (editorId !== undefined) editorName.current?.focus(); }, [editorId]);
   useEffect(() => {
     if (report) {
@@ -189,14 +192,36 @@ export default function Home() {
   function openEditor(project: WorkspaceProject) {
     invalidate();
     setEditor(project);
+    setBatchEditor(null);
     setProjectError('');
   }
 
-  function chooseProperty(property: DiscoveredProperty, url: string): boolean {
-    if (editor && (editor.name || editor.url || editor.propertyId) &&
-      !window.confirm('Replace the current project draft with this GA4 property?')) return false;
-    openEditor({ id: '', name: property.name, propertyId: property.propertyId, url });
+  function chooseProperties(properties: DiscoveredPropertyDraft[]): boolean {
+    if (((editor && (editor.name || editor.url || editor.propertyId)) || batchEditor?.length) &&
+      !window.confirm('Replace your current project draft with the selected GA4 properties?')) return false;
+    if (properties.length === 1) {
+      const property = properties[0];
+      openEditor({ id: '', name: property.name, propertyId: property.propertyId, url: property.url });
+    } else {
+      invalidate();
+      setEditor(null);
+      setBatchEditor(properties.map(property => ({
+        id: crypto.randomUUID(), name: property.name, propertyId: property.propertyId, url: property.url,
+      })));
+      setProjectError('');
+    }
     return true;
+  }
+
+  function saveProjectBatch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!batchEditor) return;
+    const drafts = batchEditor.map(projectSettings);
+    const message = validateProjectBatch(projects, drafts);
+    if (message) { setProjectError(message); return; }
+    persist([...projects, ...drafts]);
+    setBatchEditor(null);
+    setProjectError('');
   }
 
   function saveProject(event: React.FormEvent<HTMLFormElement>) {
@@ -218,7 +243,7 @@ export default function Home() {
     event?.preventDefault();
     if (busy.current || demo) return;
     setFeedback('');
-    if (editor) { setError('Save or cancel the project you are editing before generating a report.'); return; }
+    if (editing) { setError('Save or cancel the projects you are editing before generating a report.'); return; }
     if (!projects.length) { setError('Add at least one project to generate a report.'); return; }
     if (connection.error) { setError(connection.error); return; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate) || !Number.isFinite(Date.parse(`${endDate}T12:00:00Z`)) || endDate > today()) {
@@ -321,22 +346,37 @@ export default function Home() {
         <main id="main">
           <section className="page-intro" id="overview"><div><p className="eyebrow">A LITTLE PERSPECTIVE, EVERY MONTH</p><h1>Know what’s <em>moving.</em></h1><p className="intro-copy">Your projects, side by side. Less digging through analytics.<br className="desktop-break" /> More understanding what changed.</p></div><button className="button secondary demo-button" type="button" onClick={exploreDemo}>Explore demo <Icon name="external" /></button></section>
 
-          <div className="setup-grid">
+          <div className={`setup-grid${projects.length === 0 && !editing ? ' is-empty' : ''}`}>
             <section className="panel projects-panel" id="projects" aria-labelledby="projects-heading">
-              <div className="section-header"><div><p className="eyebrow">THE THINGS YOU’RE BUILDING</p><h2 id="projects-heading">Your projects <span className="count-badge">{projects.length}</span></h2></div><button type="button" className="button small secondary" disabled={!ready || projects.length >= 12 || !!editor} onClick={() => openEditor(blankProject())}><Icon name="plus" />Add project</button></div>
+              <div className="section-header"><div><p className="eyebrow">THE THINGS YOU’RE BUILDING</p><h2 id="projects-heading">Your projects <span className="count-badge">{projects.length}</span></h2></div><button type="button" className="button small secondary" disabled={!ready || projects.length >= 12 || editing} onClick={() => openEditor(blankProject())}><Icon name="plus" />Add project</button></div>
               <p className="section-copy">Saved only in this browser. Add the GA4 properties you want to compare.</p>
-              <PropertyDiscovery credentials={connection.credentials} connectionError={connection.error} projects={projects} disabled={!ready} onChoose={chooseProperty} onVerified={() => { setVerified(true); setKeyNotice(''); }} />
-              {!ready ? <p className="empty-inline">Opening your workspace…</p> : projects.length === 0 && !editor ? <div className="project-empty"><p>A home for your side projects.</p><span>Add your first project, or explore the demo.</span><button className="text-button" type="button" onClick={() => openEditor(blankProject())}>Add your first project <Icon name="arrow" /></button></div> : null}
+              <PropertyDiscovery credentials={connection.credentials} connectionError={connection.error} projects={projects} disabled={!ready} onChoose={chooseProperties} onVerified={() => { setVerified(true); setKeyNotice(''); }} />
+              {!ready ? <p className="empty-inline">Opening your workspace…</p> : projects.length === 0 && !editing ? <div className="project-empty"><p>A home for your side projects.</p><span>Add your first project, or explore the demo.</span><button className="text-button" type="button" onClick={() => openEditor(blankProject())}>Add your first project <Icon name="arrow" /></button></div> : null}
               {projects.length > 0 && <ul className="saved-projects">{projects.map((project, index) => <li key={project.id}>
-                <span className={`project-avatar small-avatar tone-${index % 2}`} aria-hidden="true">{project.name.slice(0, 1).toUpperCase()}</span><div className="saved-project-info"><strong>{project.name}</strong><span>{project.url}</span><span className="property-label">GA4 · {project.propertyId}</span></div><div className="project-actions"><button className="text-button" type="button" disabled={!!editor} aria-label={`Edit ${project.name}`} onClick={() => openEditor({ ...project })}>Edit</button><button className="remove-button" type="button" disabled={!!editor} aria-label={`Remove ${project.name}`} onClick={() => { if (window.confirm(`Remove ${project.name} from this browser workspace?`)) persist(projects.filter(item => item.id !== project.id)); }}><Icon name="close" /></button></div>
+                <span className={`project-avatar small-avatar tone-${index % 2}`} aria-hidden="true">{project.name.slice(0, 1).toUpperCase()}</span><div className="saved-project-info"><strong>{project.name}</strong><span>{project.url}</span><span className="property-label">GA4 · {project.propertyId}</span></div><div className="project-actions"><button className="text-button" type="button" disabled={editing} aria-label={`Edit ${project.name}`} onClick={() => openEditor({ ...project })}>Edit</button><button className="remove-button" type="button" disabled={editing} aria-label={`Remove ${project.name}`} onClick={() => { if (window.confirm(`Remove ${project.name} from this browser workspace?`)) persist(projects.filter(item => item.id !== project.id)); }}><Icon name="close" /></button></div>
               </li>)}</ul>}
               {editor && <form className="project-editor" onSubmit={saveProject}>
                 <h3>{editor.id ? 'Edit project' : 'Add a project'}</h3>
-                <label htmlFor="project-name">Project name<input ref={editorName} id="project-name" required maxLength={100} value={editor.name} placeholder="My next good idea" onChange={event => setEditor({ ...editor, name: event.target.value })} /></label>
-                <div className="form-columns"><label htmlFor="project-url">Site URL<input id="project-url" type="url" required maxLength={2048} placeholder="https://example.com" value={editor.url} onChange={event => setEditor({ ...editor, url: event.target.value })} /></label><label htmlFor="property-id">GA4 property ID<input id="property-id" inputMode="numeric" pattern="[1-9][0-9]{0,19}" required maxLength={20} placeholder="Numeric ID" value={editor.propertyId} onChange={event => setEditor({ ...editor, propertyId: event.target.value })} /></label></div>
-                <p className="hint">Find the numeric ID in GA4 → Admin → Property details. Not the G- measurement ID.</p>
+                <ProjectFields project={editor} onChange={setEditor} nameRef={editorName} />
                 {projectError && <p className="inline-error" role="alert">{projectError}</p>}
                 <div className="editor-buttons"><button className="button primary small" type="submit">Save project</button><button className="button secondary small" type="button" onClick={() => { setEditor(null); setProjectError(''); }}>Cancel</button></div>
+              </form>}
+              {batchEditor && <form className="project-editor batch-editor" onSubmit={saveProjectBatch}>
+                <h3>Review {batchEditor.length} {batchEditor.length === 1 ? 'project' : 'projects'}</h3>
+                <p className="hint">Check the detected names and URLs. Nothing is added until you save. Enter a Site URL for any property without a web stream URL.</p>
+                {batchEditor.map((project, index) => <fieldset className="batch-project" key={project.id}>
+                  <legend>{project.name || 'Untitled project'}</legend>
+                  <div className="batch-project-header"><span className="hint">GA4 property {project.propertyId}</span><button className="remove-button" type="button" aria-label={`Remove ${project.name || 'project'} from batch`} onClick={() => {
+                    setBatchEditor(current => {
+                      const next = current?.filter(item => item.id !== project.id) ?? [];
+                      return next.length ? next : null;
+                    });
+                    setProjectError('');
+                  }}><Icon name="close" /></button></div>
+                  <ProjectFields project={project} idPrefix={`${project.id}-`} nameRef={index === 0 ? editorName : undefined} onChange={next => setBatchEditor(current => current?.map(item => item.id === next.id ? next : item) ?? null)} />
+                </fieldset>)}
+                {projectError && <p className="inline-error" role="alert">{projectError}</p>}
+                <div className="editor-buttons"><button className="button primary small" type="submit">Save {batchEditor.length} {batchEditor.length === 1 ? 'project' : 'projects'}</button><button className="button secondary small" type="button" onClick={() => { setBatchEditor(null); setProjectError(''); }}>Cancel</button></div>
               </form>}
               {storageError && <div className="notice warning" role="alert"><p>{storageError}</p><button className="text-button" type="button" onClick={() => { try { saveWorkspace(window.localStorage, projects); setStorageError(''); } catch { setStorageError('Still unable to save. Your projects are available only in this tab.'); } }}>Retry saving</button></div>}
             </section>

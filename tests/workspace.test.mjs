@@ -3,7 +3,7 @@ import test from 'node:test';
 import { createDemo } from '../app/lib/demo.ts';
 import {
   WORKSPACE_KEY, delta, exportData, percent, readWorkspace, reportMarkdown,
-  saveWorkspace, validateProject,
+  saveWorkspace, validateProject, validateProjectBatch,
 } from '../app/lib/workspace.ts';
 
 const project = { id: 'site-one', name: 'Example', url: 'https://example.com', propertyId: '123456789' };
@@ -37,6 +37,26 @@ test('project validation rejects non-reporting IDs and unsafe site links', () =>
   ]) {
     assert.ok(validateProject({ ...project, ...invalid }), JSON.stringify(invalid));
   }
+});
+
+test('batch review requires complete projects and enforces the exact twelve-project workspace limit', () => {
+  const drafts = Array.from({ length: 12 }, (_, index) => ({
+    ...project, id: `batch-${index}`, name: `Site ${index + 1}`, propertyId: `${index + 1}`,
+  }));
+  assert.equal(validateProjectBatch([], drafts), null);
+  assert.equal(validateProjectBatch([project], drafts.slice(0, 11)), null);
+  assert.match(validateProjectBatch([project], drafts), /12 projects/);
+  assert.match(validateProjectBatch([], []), /at least one/);
+  assert.match(validateProjectBatch([], [{ ...drafts[0], url: '' }]), /Site 1:.*URL/);
+  assert.match(validateProjectBatch([], [{ ...drafts[0], url: 'javascript:alert(1)' }]), /Site 1:.*URL/);
+  assert.match(validateProjectBatch([], [{ ...drafts[0], name: '' }]), /Project:.*name/);
+});
+
+test('batch review rejects existing and repeated property IDs or project identifiers', () => {
+  assert.match(validateProjectBatch([project], [{ ...project, id: 'new-site' }]), /already/);
+  assert.match(validateProjectBatch([project], [{ ...project, propertyId: '234567890' }]), /identifiers/);
+  assert.match(validateProjectBatch([], [project, { ...project, id: 'new-site' }]), /more than once/);
+  assert.match(validateProjectBatch([], [project, { ...project, propertyId: '234567890' }]), /identifiers/);
 });
 
 test('demo is deterministic, complete and explicitly labeled in credential-free exports', () => {

@@ -24,6 +24,22 @@ export function projectSettings(project: WorkspaceProject): WorkspaceProject {
   return { id: project.id, name: project.name.trim(), url: project.url.trim(), propertyId: project.propertyId.trim() };
 }
 
+export function validateProjectBatch(projects: WorkspaceProject[], drafts: WorkspaceProject[]): string | null {
+  if (!drafts.length) return 'Select at least one property to add.';
+  if (projects.length + drafts.length > 12) return 'Your workspace supports up to 12 projects. Remove a project or select fewer properties.';
+  const ids = new Set(projects.map(project => project.id));
+  const propertyIds = new Set(projects.map(project => project.propertyId));
+  for (const draft of drafts) {
+    const error = validateProject(draft);
+    if (error) return `${draft.name.trim() || 'Project'}: ${error}`;
+    if (ids.has(draft.id)) return 'Project identifiers must be unique.';
+    if (propertyIds.has(draft.propertyId)) return `GA4 property ${draft.propertyId} is already in your workspace or selected more than once.`;
+    ids.add(draft.id);
+    propertyIds.add(draft.propertyId);
+  }
+  return null;
+}
+
 export function readWorkspace(storage: Pick<Storage, 'getItem'>): WorkspaceProject[] {
   const raw = storage.getItem(WORKSPACE_KEY);
   if (raw === null) return [];
