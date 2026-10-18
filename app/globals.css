@@ -73,7 +73,6 @@ h1 em { font-family: Georgia, "Times New Roman", serif; font-weight: normal; col
 .count-badge { font: 10px var(--font-mono); padding: 3px 5px; border-radius: 4px; background: var(--mist); color: var(--muted); }
 .section-copy { color: var(--muted); font-size: 11px; line-height: 1.8; margin-top: 12px; }
 .project-empty { padding: 27px 8px 14px; text-align: center; }
-.empty-symbol { display: inline-flex; align-items: center; justify-content: center; width: 37px; height: 37px; background: var(--mist); color: var(--muted); border: 1px dashed #b9c6d7; border-radius: 9px; font-size: 20px; margin-bottom: 12px; }
 .project-empty p { font-size: 13px; font-weight: 600; }
 .project-empty > span:last-of-type { display: block; font-size: 11px; color: var(--muted); margin-top: 6px; }
 .project-empty .text-button { margin-top: 16px; }
