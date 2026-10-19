@@ -38,6 +38,7 @@ export default function PropertyDiscovery({ credentials, projects, connectionErr
   useEffect(() => { callbacks.current = { onAdd, onVerified }; }, [onAdd, onVerified]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Manual project changes can invalidate selections and reduce available capacity.
     setSelectedIds(current => current.filter(id => !projects.some(project => project.propertyId === id)).slice(0, Math.max(0, 12 - projects.length)));
   }, [projects]);
 
@@ -45,6 +46,7 @@ export default function PropertyDiscovery({ credentials, projects, connectionErr
     requestId.current += 1;
     controller.current?.abort();
     busy.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Discard discovery state when credentials change, alongside aborting its requests.
     setResult(null);
     setLoading(false);
     setError('');

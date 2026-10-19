@@ -23,6 +23,10 @@ Inspired by [Polypost](https://github.com/markrussinovich/Polypost)'s bring-your
 
 Requires Node.js 22.14 or later and npm.
 
+The app uses stable Next.js 16 and React 19. Development and production builds explicitly use Webpack to preserve the existing MDX configuration. Google SDKs remain external Node.js server dependencies so their transport and package metadata files resolve at runtime. Node types track Node 22; ESLint stays on 9 and TypeScript on 6.0 until Next's lint plugins support their next major versions. The ESLint configuration uses Next's native flat-config exports.
+
+The lint toolchain currently includes `braces@3.0.3`, which has an [upstream advisory without a published patched release](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm). It is a development-only dependency; use `npm audit --omit=dev` to check the production tree separately. Do not use `npm audit fix --force` to downgrade Next's lint configuration to an older major version.
+
 ```powershell
 npm ci
 npm run dev

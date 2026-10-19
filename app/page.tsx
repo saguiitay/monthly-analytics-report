@@ -64,6 +64,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Restore browser-only storage after hydration.
     try { setProjects(readWorkspace(window.localStorage)); }
     catch { setStorageError('Saved projects could not be read. Nothing was overwritten. You can use this workspace in memory, then save projects again.'); }
     try {
@@ -86,6 +87,7 @@ export default function Home() {
     if (!credentialStorageReady) return;
     try {
       saveCredentialSession(window.sessionStorage, { credentials, jsonKey, mode: credentialMode });
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Surface the result of synchronizing browser session storage.
       setCredentialStorageError('');
     } catch {
       setCredentialStorageError(credentials.client_email || credentials.private_key || jsonKey

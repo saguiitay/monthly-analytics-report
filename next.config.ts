@@ -12,6 +12,8 @@ const withMDX = createMDX({
 
 const nextConfig: NextConfig = {
   pageExtensions: ['js', 'jsx', 'mdx', 'ts', 'tsx'],
+  // Google SDKs resolve transport and package metadata files at runtime.
+  serverExternalPackages: ['@google-analytics/data', '@googleapis/searchconsole', 'googleapis'],
 }
 
 export default withMDX(nextConfig)

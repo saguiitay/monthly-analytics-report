@@ -1,5 +1,4 @@
-import { google, searchconsole_v1, Auth } from 'googleapis';
-import { GoogleAuth } from 'google-auth-library';
+import { auth as googleAuth, searchconsole, searchconsole_v1 } from '@googleapis/searchconsole';
 import { SearchConsoleConfig, SearchQuery, PagePerformance } from '../types';
 import { format } from 'date-fns';
 
@@ -14,7 +13,7 @@ export class SearchConsoleService {
 
   static async initialize(config: SearchConsoleConfig, siteUrl: string): Promise<SearchConsoleService> {
     try {
-      const auth = new GoogleAuth({
+      const auth = new googleAuth.GoogleAuth({
         credentials: {
           client_email: config.clientEmail,
           private_key: config.privateKey.replace(/\\n/g, '\n'),
@@ -22,10 +21,10 @@ export class SearchConsoleService {
         scopes: ['https://www.googleapis.com/auth/webmasters.readonly'],
       });
 
-      const authClient = await auth.getClient();
-      const client = google.searchconsole({
+      await auth.getClient();
+      const client = searchconsole({
         version: 'v1',
-        auth: (authClient as unknown) as Auth.OAuth2Client
+        auth
       });
 
       // const res = await client.sites.list();
